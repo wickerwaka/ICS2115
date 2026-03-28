@@ -7,6 +7,7 @@ PREFIX      := Vics2115
 # Source order matters: package first, then modules, then top
 HDL_SRCS := $(HDL_DIR)/ics2115_pkg.sv \
             $(HDL_DIR)/ics2115_tables.sv \
+            $(HDL_DIR)/ics2115_osc.sv \
             $(HDL_DIR)/ics2115.sv
 
 TB_SRC := ics2115_tb.cpp
