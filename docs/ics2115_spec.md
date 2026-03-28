@@ -539,3 +539,531 @@ The ICS2115 shares the same basic register architecture as the GF1 used in the G
 (GUS SDK: Sections 2.5, 2.6; Datasheet: Register Map; MAME: source comparison)
 
 > **Uncertainty:** The exact voice-servicing pipeline timing of the ICS2115 vs. GF1 is not fully documented. The GUS SDK states 1.6 µs per voice for the GF1. The ICS2115 may use a different internal pipeline, as suggested by the `clock/(N*32)` formula in MAME which implies 32 clock cycles per voice rather than a fixed microsecond timing.
+
+---
+
+## 6. Oscillator (Wavesample Engine)
+
+The oscillator is the core sample playback engine. Each of the 32 voices has an independent oscillator that reads sample data from ROM/DRAM, advances a position accumulator at a programmable rate, and performs linear interpolation between adjacent samples.
+
+### 6.1 Accumulator Update
+
+On each sample tick, the oscillator accumulator advances by the frequency counter value:
+
+```
+if not stopped:
+    if direction == FORWARD:
+        acc += fc << 2
+        left = end - acc
+    else:  // REVERSE
+        acc -= fc << 2
+        left = acc - start
+```
+
+The `fc << 2` shift aligns the 6.9 frequency counter (see §2.2) into the 20.9 accumulator space. The `left` variable tracks the signed distance remaining before a boundary crossing — when `left` goes to zero or negative, a boundary has been reached. (MAME: `update_oscillator()` L309-318)
+
+> **Uncertainty:** MAME uses `left > 0` rather than `left >= 0` for the boundary check, with a comment "> instead of >= to stop crackling?" This means a boundary is crossed when `left` is exactly zero, which may not match the real hardware's comparator behavior.
+
+### 6.2 Boundary Crossing and Loop Modes
+
+When the accumulator crosses a boundary (`left <= 0`), the behavior depends on the OscConf register bits:
+
+**Next-Address Logic Table** (US Patent 6,246,774 B1, column 111, row 25):
+
+```
+LEN   BLEN   DIR   BC    NextAddress
+─────────────────────────────────────────────────────────
+ x     x      0     0    acc + fc              // forward, no boundary
+ x     x      1     0    acc - fc              // reverse, no boundary
+ 0     x      x     1    acc                   // no loop: stop, hold position
+ 1     0      0     1    start - (end - (acc + fc))   // forward loop wraparound
+ 1     0      1     1    end + ((acc - fc) - start)   // reverse loop wraparound
+ 1     1      0     1    end + (end - (acc + fc))     // bidir: reflect at end
+ 1     1      1     1    start - ((acc - fc) - start) // bidir: reflect at start
+```
+
+Where LEN = loop enable, BLEN = bidirectional loop enable, DIR = invert (direction), BC = boundary cross.
+
+**MAME implementation of boundary handling:**
+
+```
+if loop_enabled:
+    if bidir_loop:
+        invert = !invert               // flip direction
+    if invert (now heading reverse):
+        acc = end + left                // left is negative, so acc = end - |overshoot|
+    else (now heading forward):
+        acc = start - left              // left is negative, so acc = start + |overshoot|
+else:  // one-shot mode
+    state.on = false
+    stop = true
+    if direction == FORWARD:
+        acc = end                       // clamp to end
+    else:
+        acc = start                     // clamp to start
+```
+
+(MAME: `update_oscillator()` L319-358)
+
+The `left` variable carries the signed overshoot, so `start - left` (where left is negative) correctly places the accumulator past the start boundary by the overshoot amount. This produces seamless loop wrapping without losing fractional position.
+
+**Oscillator IRQ:** If the IRQ enable bit (OscConf bit 5) is set and a boundary crossing occurs, the `irq_pending` flag (OscConf bit 7) is set. The IRQ is raised regardless of loop mode — even one-shot voices can generate a boundary IRQ. (MAME: `update_oscillator()` L323-327)
+
+### 6.3 Sample Fetch and Address Construction
+
+Sample data is fetched from ROM/DRAM using the static address register and the accumulator:
+
+```
+byte_address = (saddr << 20) | (acc >> 12)
+```
+
+Where `saddr` (register 0x11, 8-bit) selects the 1 MB bank and `acc >> 12` yields the 20-bit byte offset within that bank. (MAME: `ics2115.h` L129 — `read_sample()`)
+
+**Three sample formats** are supported, determined by OscConf bits 2 and 0:
+
+| `eightbit` | `ulaw` | Format | Bytes per sample | Fetch |
+|------------|--------|--------|-----------------|-------|
+| 0 | 0 | 16-bit linear signed | 2 | Little-endian: `lo \| (hi << 8)` |
+| 1 | 0 | 8-bit linear signed | 1 | Sign-extended to 16-bit: `(s8)byte << 8` |
+| x | 1 | 8-bit µ-law compressed | 1 | Decoded via µ-law table (see §3.2) |
+
+(MAME: `get_sample()` L376-394)
+
+For **16-bit samples**, two bytes are read per sample point in little-endian order:
+```
+sample = read_byte(curaddr) | (s8(read_byte(curaddr + 1)) << 8)
+```
+
+For **8-bit samples**, one byte is read and sign-extended to 16-bit:
+```
+sample = s8(read_byte(curaddr)) << 8
+```
+
+For **µ-law samples**, one byte is read and decoded through the 256-entry lookup table:
+```
+sample = ulaw_table[read_byte(curaddr)]
+```
+
+### 6.4 Next-Sample Address for Interpolation
+
+The interpolator needs two adjacent samples. The "next" sample address depends on whether the voice is approaching a loop boundary:
+
+```
+if voice_on AND loop_enabled AND NOT bidir_loop AND (left < fc << 2):
+    nextaddr = start >> 12      // next sample wraps to loop start
+else:
+    nextaddr = curaddr + 2      // next sequential sample (2 bytes for 16-bit)
+```
+
+This handles the case where the current position is within one step of the loop end — the interpolator blends between the last sample before the end and the first sample at the loop start, preventing a discontinuity at the loop point. (MAME: `get_sample()` L367-375)
+
+> **Uncertainty:** The `nextaddr = curaddr + 2` assumes 16-bit (2-byte) samples, but this same offset is used for 8-bit and µ-law modes in MAME. For 8-bit/µ-law, the next sample should logically be at `curaddr + 1`. The MAME code fetches `curaddr + 1` for 8-bit and µ-law sample2, which is the correct adjacent byte — but then `nextaddr` is only used for the 16-bit path. This appears correct but the variable naming is misleading.
+
+### 6.5 Linear Interpolation
+
+The oscillator performs linear interpolation between two adjacent samples using the fractional part of the accumulator:
+
+```
+Bit layout of fractional position:
+acc[11:3] = 9-bit fraction (0–511)
+
+fract = (acc & 0xFF8) >> 3      // extract 9-bit fraction
+diff = sample2 - sample1
+output = (sample1 << 9 + diff * fract) >> 9
+```
+
+This is equivalent to:
+```
+output = sample1 + (sample2 - sample1) * fract / 512
+```
+
+The formula blends linearly from `sample1` (when fract=0) to `sample2` (when fract=511). The intermediate result uses 25 bits (16-bit sample × 9-bit fraction) before the final right shift. (MAME: `get_sample()` L396-403; US Patent 6,246,774 B1, column 2, row 59)
+
+> **Source Divergence:** The MAME comment says "no need for interpolation since it's around 1 note a cycle?" and has commented-out code that would skip interpolation when `fract == 0`. The production code always interpolates. The patent explicitly describes the interpolation formula, confirming it is part of the hardware design.
+
+### 6.6 GF1 Oscillator Comparison
+
+The GF1 uses the same fundamental accumulator+interpolation architecture. Key differences:
+
+| Aspect | GF1 (from `gf1.v`) | ICS2115 |
+|--------|---------------------|---------|
+| Accumulator width | 29 bits in 148-bit voice RAM | 32 bits (29 significant) |
+| Sample formats | 8-bit, 16-bit | 8-bit, 16-bit, µ-law |
+| Interpolation | Same formula (patent-derived) | Same formula |
+| Next-address logic | Same table (patent column 111) | Same table |
+| Voice RAM storage | 148-bit interleaved shift register | Separate register fields |
+
+(GF1: `gf1.v` L73 — `voice_ram[0:31]` is 148 bits; MAME/Patent: shared next-address table)
+
+---
+
+## 7. Volume Envelope (Ramp System)
+
+The ICS2115 has two distinct volume-control mechanisms per voice:
+1. **Volume envelope** — a programmable ramp controlled by registers VStart (0x07), VEnd (0x08), VIncr (0x06), VolAcc (0x09), and VCtl (0x0D). This implements ADSR-style envelope segments.
+2. **Voice ramp** — a simple 7-bit amplitude gate (`state.ramp`, range 0x00–0x40) that provides slow attack/release smoothing independent of the volume envelope.
+
+### 7.1 Volume Envelope Accumulator Update
+
+The volume envelope operates on a 32-bit accumulator (`vol.acc`). On each sample tick, if the envelope is running (not stopped, not done):
+
+```
+if direction == INCREASING (invert = 0):
+    vol.acc += vol.add
+    left = vol.end - vol.acc
+else:  // DECREASING (invert = 1)
+    vol.acc -= vol.add
+    left = vol.acc - vol.start
+```
+
+When `left <= 0`, a boundary has been crossed. (MAME: `update_volume_envelope()` L247-258)
+
+### 7.2 Increment Calculation
+
+The volume increment is decoded from the 8-bit VIncr register (0x06) into the internal `vol.add` value:
+
+```
+incr = register 0x06 value (8-bit)
+fine = 1 << (3 * (incr >> 6))       // rate scale bits [7:6]
+vol.add = (incr & 0x3F) << (10 - fine)   // magnitude bits [5:0]
+```
+
+**Rate scale decoding:**
+
+| Bits [7:6] | fine | Shift (10 - fine) | Effect |
+|------------|------|-------------------|--------|
+| 0 | 1 | 9 | Fastest: large steps, applied every tick |
+| 1 | 8 | 2 | Fast: medium steps |
+| 2 | 64 | −54 | **Bug: negative shift** |
+| 3 | 512 | −502 | **Bug: negative shift** |
+
+(MAME: `fill_output()` L444-445)
+
+> **Uncertainty:** The `fine = 1 << (3 * scale)` formula produces values {1, 8, 64, 512} for scales {0, 1, 2, 3}. For scales 2 and 3, `10 - fine` is massively negative, which would cause undefined behavior in C++. The GUS SDK describes the rate bits differently — as controlling how often the increment is applied (every tick, every 8th tick, every 64th tick, every 512th tick) rather than affecting the shift amount. The GF1 hardware verilog (`gf1.v` L243-245, L286) implements rate scaling by dividing a counter by the rate factor, confirming the GUS SDK interpretation. The MAME formula appears to be a misinterpretation that only works correctly for rate scales 0 and 1.
+
+**GUS SDK interpretation** (Section 2.22): The rate bits define the Volume Update Rate as a divisor of the fundamental update rate (FUR):
+
+```
+Rate 00: update every tick (FUR)
+Rate 01: update every 8th tick (FUR/8)
+Rate 10: update every 64th tick (FUR/64)
+Rate 11: update every 512th tick (FUR/512)
+```
+
+Where `FUR = 1 / (1.6µs × active_voices)` for the GF1. Each rate increment is 8× longer than the previous. (GUS SDK: Section 2.22, p34)
+
+**GF1 hardware implementation** (`gf1.v` L286): The GF1 uses a 9-bit ramp counter (`ramp_cnt`) with the rate bits selecting which counter bits to test, effectively creating a divider chain.
+
+> **Source Divergence:** MAME's increment calculation differs from both the GUS SDK description and the GF1 verilog. The GUS SDK and GF1 verilog agree that rate bits control *how often* the increment is applied, not *how much* the increment is shifted. For implementation, the GF1/GUS SDK model (counter-based rate divider) is more likely correct for the ICS2115 as well, given the shared register architecture.
+
+### 7.3 Boundary Crossing Behavior
+
+When the volume accumulator crosses its boundary (`left <= 0`), the behavior depends on VCtl register bits:
+
+**Volume Next-State Logic Table** (US Patent 5,809,466, column 126):
+
+```
+UVOL  LEN   BLEN   DIR   BC    Next VOL(L)
+────────────────────────────────────────────────────────────────
+ 0     x     x      x     x    VOL(L)                            // envelope disabled
+ 1     x     x      0     0    VOL(L) + VINC                     // increasing, no boundary
+ 1     x     x      1     0    VOL(L) - VINC                     // decreasing, no boundary
+ 1     0     x      x     1    VOL(L)                             // no loop: hold at boundary
+────────────────────────────────────────────────────────────────
+ 1     1     0      0     1    start - (end - (VOL(L) + VINC))   // loop fwd: wrap to start
+ 1     1     0      1     1    end + ((VOL(L) - VINC) - start)   // loop rev: wrap to end
+ 1     1     1      0     1    end + (end - (VOL(L) + VINC))     // bidir fwd: reflect at end
+ 1     1     1      1     1    start - ((VOL(L) - VINC) - start) // bidir rev: reflect at start
+```
+
+Where UVOL = volume envelope update enable, LEN = loop enable, BLEN = bidirectional loop enable, DIR = invert, BC = boundary cross. (MAME: `update_volume_envelope()` comment block L218-231)
+
+**Volume IRQ:** If IRQ enable (VCtl bit 5) is set, the `irq_pending` flag is set on boundary crossing regardless of loop mode. (MAME: `update_volume_envelope()` L260-264)
+
+**8-bit mode exception:** When OscConf `eightbit` bit is set, the boundary crossing loop logic is skipped entirely — only the IRQ is generated but no accumulator wrapping occurs. This may be related to reduced precision requirements for 8-bit samples. (MAME: `update_volume_envelope()` L266-267)
+
+**Non-looping termination:** When loop is disabled and a boundary is crossed, `vol_ctrl.done` is set, which permanently stops the envelope until software resets it. (MAME: `update_volume_envelope()` L293-294)
+
+### 7.4 The Boundary Cross Bug
+
+The MAME implementation has a known tautological bug in the boundary cross detection:
+
+```c
+// MAME L240-241:
+if (vol.acc >= vol.end || vol.acc <= vol.end)
+    bc = true;
+```
+
+This condition is always true — `bc` is always set to `true`. The variable `bc` is then used in the loop wrapping logic (only the `bc` branch of the wrap equations is ever taken).
+
+**Intended behavior (derived from context):** The boundary cross should be directional, matching the oscillator's approach:
+
+```
+if direction == INCREASING:
+    bc = (vol.acc >= vol.end)
+else:
+    bc = (vol.acc <= vol.start)    // or possibly vol.end
+```
+
+The patent next-state table (§7.3) shows BC as a distinct condition separate from the `left <= 0` check. In the current MAME code, the `left <= 0` check controls whether the boundary path is entered at all, and `bc` controls which wrap formula is used within that path. Since `bc` is always true, the wrap formulas are always applied, which appears to produce correct-enough behavior for the common case. (MAME: `update_volume_envelope()` L240-241)
+
+> **Uncertainty:** The `bc` variable in the volume envelope may have been intended to detect a specific boundary crossing condition distinct from the `left` overflow check — possibly distinguishing between "at boundary" versus "past boundary." With `bc` always true, the MAME implementation collapses these cases. The real hardware's behavior at the exact boundary point may differ subtly.
+
+### 7.5 Voice Ramp (Amplitude Gate)
+
+Separate from the volume envelope, each voice has a `state.ramp` field — a 7-bit value (range 0x00–0x40) that acts as a global amplitude gate. This provides click-free key-on/key-off transitions:
+
+```
+if voice_on AND NOT stopped:
+    // slow attack
+    if ramp < 0x40:
+        ramp += 1
+    else:
+        ramp = 0x40        // clamp at maximum
+else:
+    // slow release
+    if ramp > 0:
+        ramp -= 1
+```
+
+The ramp value is applied as a multiplier in the mixing stage (see §8.1), scaled by shifting right 6 bits (`RAMP_SHIFT = 6`). At maximum (`0x40` = 64), the ramp is unity (64 >> 6 = 1). At zero, the voice is fully muted. (MAME: `update_ramp()` L413-429)
+
+**Key-on behavior:** When `keyon()` is called (register 0x10 write with value 0x00), the ramp is initialized to `0x40` (full volume immediately), bypassing the slow attack:
+
+```
+state.ramp = 0x40    // immediate full volume on keyon
+```
+
+(MAME: `keyon()` L1049)
+
+> **Uncertainty:** The MAME comment says "set initial condition (may need to invert?) -- does NOT work since these are set to zero even no ramp up..." This suggests uncertainty about whether keyon should set ramp to 0x40 (bypassing attack) or to 0x00 (requiring the slow ramp-up). The current implementation sets it to 0x40, which means the slow attack ramp never engages after keyon — only after a voice is stopped and restarted without going through keyon. The slow release (ramp decrement when voice stops) does function, providing click-free note-off.
+
+### 7.6 ADSR Implementation via IRQ Chain
+
+The volume envelope hardware implements a single ramp segment at a time. ADSR (attack-decay-sustain-release) envelopes are built by software using the volume IRQ:
+
+1. **Attack:** Set VStart=0 (silence), VEnd=peak, direction=increasing, IRQ=enabled. Start ramp.
+2. When attack reaches peak → volume IRQ fires.
+3. **Decay:** In IRQ handler, set VStart=sustain_level, VEnd=peak, direction=decreasing, IRQ=enabled.
+4. When decay reaches sustain → volume IRQ fires.
+5. **Sustain:** In IRQ handler, set stop=true (hold) or set loop between two close values for vibrato.
+6. **Release:** On note-off, set VEnd=0, direction=decreasing, IRQ=enabled (or disabled for final fade).
+
+This matches the GUS SDK approach: "A section of the envelope can be programmed such that the PC does not need to be burdened with the task of changing each volume at specified intervals. At the end of that particular section, an IRQ can be generated so that the next section can be programmed in." (GUS SDK: Section 2.22, p33)
+
+### 7.7 Volume Ramp Format (GUS SDK)
+
+The GUS SDK documents the volume register formats in the "EEEEMMMM" notation:
+
+```
+Current Volume (reg 0x09):  EEEEMMMMMMMM xxxx  (bits 15-4, 12-bit: 4 exponent + 8 mantissa)
+Volume Start (reg 0x07):    EEEEMMMM            (8-bit: 4 exponent + 4 mantissa)
+Volume End (reg 0x08):      EEEEMMMM            (8-bit: 4 exponent + 4 mantissa)
+Volume Incr (reg 0x06):     RRMMMMMM            (8-bit: 2 rate + 6 magnitude)
+```
+
+The Current Volume register has 4 extra mantissa bits compared to Start/End, providing "finer granularity of volume placement" during ramping. Start and End registers are expanded internally by shifting left to align with the full-precision accumulator. (GUS SDK: Section 2.22, p33; Section 2.6.2.10, p22)
+
+**Approximate ramp times** for a full-scale sweep (0–4095) with 14 active voices (GUS):
+
+| Rate | Vol Inc | Time (14 voices) | Time (32 voices) |
+|------|---------|-------------------|-------------------|
+| 0 | 63 | 1.4 ms | 3.3 ms |
+| 0 | 1 | 91.7 ms | 209.7 ms |
+| 1 | 63 | 11.5 ms | 26.2 ms |
+| 1 | 1 | 733.8 ms | 1.7 s |
+| 2 | 63 | 91.8 ms | 209.7 ms |
+| 3 | 1 | 5.9 s | 13.4 s |
+| 3 | 63 | 734.0 ms | 1.7 s |
+| 3 | 1 | 47.0 s | 107.3 s |
+
+(GUS SDK: Section 2.22, p34)
+
+### 7.8 GF1 Ramp Pipeline Comparison
+
+The GF1 hardware implements the volume ramp as a multi-stage pipeline in `gf1.v`:
+
+```
+Voice RAM layout (148 bits per voice, ramp-related fields):
+  ramp_cur[11:0]    — current volume (12-bit, interleaved in voice RAM)
+  ramp_start[11:0]  — ramp start (8-bit, lower 4 bits zero-padded)
+  ramp_end[11:0]    — ramp end (8-bit, lower 4 bits zero-padded)
+  ramp_inc[5:0]     — increment value (6-bit, gated by w368)
+  ramp_params[7:0]  — control bits (stop, done, bidir, loop, irq_en, irq_pending, dir)
+```
+
+The GF1 ramp uses dedicated next-state logic wires:
+
+```verilog
+ramp_end_cond    = ramp_end_reach
+ramp_irq_pend    = irq_en & (irq_pending | ramp_end_reach)
+ramp_status_next = done | (~done & (ramp_end_cond & ~stop))
+ramp_dir_next    = dir ^ (ramp_end_cond & (stop & bidir))
+```
+
+(GF1: `gf1.v` L243-258, L266-297, L300-340)
+
+Key difference: the GF1 stores ramp values in 12-bit interleaved format within the 148-bit voice RAM, while the ICS2115 (per MAME) uses a 32-bit accumulator with the upper 12 bits used for lookup. The GF1 ramp pipeline operates in hardware clock cycles; the ICS2115's register-level behavior is compatible but the internal pipeline may differ.
+
+---
+
+## 8. Mixing & Audio Output
+
+The mixing stage combines the interpolated sample, volume envelope, pan law, and voice ramp into the final stereo output.
+
+### 8.1 Per-Voice Rendering Pipeline
+
+For each voice, on each sample tick, the following pipeline executes:
+
+```
+Step 1: Volume lookup
+    volacc = (vol.acc >> 14) & 0xFFF          // 12-bit volume index from accumulator
+    vlefti  = volacc - panlaw[255 - pan]       // left attenuation index
+    vrighti = volacc - panlaw[pan]             // right attenuation index
+
+Step 2: Clamp negative indices (prevents table underrun)
+    vleft  = (vlefti > 0) ? volume_table[vlefti] : 0
+    vright = (vrighti > 0) ? volume_table[vrighti] : 0
+
+Step 3: Apply voice ramp (amplitude gate)
+    vleft  = vleft * state.ramp >> RAMP_SHIFT  // RAMP_SHIFT = 6
+    vright = vright * state.ramp >> RAMP_SHIFT
+
+Step 4: Fetch interpolated sample
+    sample = get_sample(voice)                 // see §6.5
+
+Step 5: Scale and accumulate into stereo bus
+    left_bus  += (sample * vleft) >> (5 + volume_bits)
+    right_bus += (sample * vright) >> (5 + volume_bits)
+```
+
+Where `volume_bits = 15` and the `>> (5 + 15) = >> 20` normalizes the product of a 16-bit sample × 15-bit volume into the 16-bit output range. The 5-bit headroom accounts for summing up to 32 voices (2^5 = 32). (MAME: `fill_output()` L431-472)
+
+### 8.2 Pan Law Application
+
+Panning is implemented by subtracting a pan-law offset from the volume index *before* the volume table lookup. This is an attenuation model — panning reduces one channel's volume rather than boosting the other:
+
+```
+Bit layout of pan register (0x0C, 8-bit):
+[7:0]  pan position (0 = left, 255 = right)
+
+Left volume index  = volacc - panlaw[255 - pan]   // more attenuation as pan moves right
+Right volume index = volacc - panlaw[pan]          // more attenuation as pan moves left
+```
+
+Since the volume table is exponential (see §3.1), subtracting from the index in the exponential domain is equivalent to dividing in the linear domain — this produces a logarithmic pan law. Each unit of pan table offset corresponds to approximately 6 dB of attenuation (one exponent step). (MAME: `fill_output()` L449-452; §3.3 Pan Law Table)
+
+**Negative index clamping:** If the pan attenuation drives the volume index below zero (heavy attenuation), the volume is clamped to zero (silence) rather than wrapping. The MAME comment "check negative values so no cracks, is it a hardware feature?" suggests this may be a deliberate hardware protection against lookup table underrun. (MAME: `fill_output()` L453-454)
+
+### 8.3 Vmode and Stopped Voice Contribution
+
+The `vmode` flag (register 0x12) controls whether stopped voices contribute to the output mix:
+
+```
+if vmode == 0 OR voice.playing():
+    // voice contributes to output
+    left_bus += scaled_sample
+    right_bus += scaled_sample
+```
+
+When `vmode = 0` (default): all voices contribute to the output, even stopped ones. Whatever sample data the stopped voice's accumulator points at is included in the mix. When `vmode = 1`: only playing voices contribute. (MAME: `fill_output()` L462-467)
+
+The GUS SDK confirms this behavior: "In general, it is necessary to remember that all voices are being summed in to the final output, even if they are not running. This means that whatever data value that the voice is pointing at is contributing to the summation." (GUS SDK: as cited in MAME comments)
+
+> **Uncertainty:** The exact purpose of `vmode` is unclear. Setting `vmode = 0` means stopped voices add DC offset or noise to the output. This could be the intended GUS-compatible behavior (matching the GUS SDK description), while `vmode = 1` provides cleaner output by silencing inactive voices. The register is documented as "Reserved (write 0)" in the datasheet, suggesting `vmode = 0` is the expected operating mode.
+
+### 8.4 Per-Sample Update Order
+
+Within each sample tick, the operations execute in this order for each voice:
+
+```
+1. Compute volume (pan, ramp, table lookup)
+2. Fetch and interpolate sample
+3. Scale sample by volume and accumulate into stereo bus
+4. Update voice ramp (slow attack/release)
+5. If voice is playing:
+   a. Update oscillator accumulator (may trigger boundary cross / IRQ)
+   b. Update volume envelope accumulator (may trigger boundary cross / IRQ)
+```
+
+Volume and sample fetch happen *before* the accumulator updates, meaning the output reflects the *current* position and volume, not the next-tick values. IRQs from boundary crossings are collected and processed after all voices have been rendered. (MAME: `fill_output()` L447-473)
+
+### 8.5 Multi-Voice Mixing Loop
+
+The `sound_stream_update()` function iterates over all active voices:
+
+```
+for osc = 0 to active_osc:
+    irq_invalid |= fill_output(voice[osc])
+
+if irq_invalid:
+    recalc_irq()
+```
+
+The output stream is initialized to silence (zero) before the loop begins. Each voice's contribution is *added* to the running sum — the mix is purely additive. IRQ recalculation is deferred until all voices have been processed, preventing re-entrant IRQ handling during the mixing loop. (MAME: `sound_stream_update()` L474-522)
+
+**Sample rate:** The output stream runs at `clock / ((active_osc + 1) * 32)` Hz (see §1.2). All voices are rendered at this same rate — there is no per-voice sample rate. Voices that need different playback frequencies achieve this through their frequency counter (FC) register, which controls the accumulator advancement rate.
+
+### 8.6 Output Bit Budget
+
+The bit widths through the mixing pipeline:
+
+```
+Sample:           16-bit signed (-32768 to +32767)
+Volume:           15-bit unsigned (0 to 32767, from volume table)
+Ramp:              7-bit unsigned (0 to 64, >> 6 makes it 0 or 1)
+Product:          31-bit signed (sample × volume)
+Shift:            >> 20 (5 for 32-voice headroom + 15 for volume normalization)
+Per-voice result: 11-bit signed (approximate, before accumulation)
+Accumulation:     up to 32 voices summed
+Final output:     16-bit signed (clipped at ±32768 by stream)
+```
+
+### 8.7 GF1 Mixing Pipeline Comparison
+
+The GF1 hardware mixing pipeline (from `gf1.v`) differs in implementation but achieves a similar result:
+
+**Attenuation:** The GF1 combines the 12-bit volume with a 9-bit pan attenuation value, then shifts:
+```verilog
+atten1 = atten_l + { pan_atten, 4'h0 }     // volume + pan offset (shifted left 4)
+atten = (pan == 0xF | overflow) ? 0 : atten1  // full atten if pan=15 or overflow
+val_shifted = mul_result >> (~atten[11:8])   // shift by inverted exponent
+```
+
+The GF1 uses a 4-bit pan (0–15) with a hardware lookup table for attenuation values. Pan position 0x0F acts as full mute for that channel. (GF1: `gf1.v` L714-721, L2806-2821)
+
+**GF1 Pan Attenuation Table** (from die decode):
+
+| Pan | Atten (9-bit) | Pan | Atten (9-bit) |
+|-----|---------------|-----|---------------|
+| 0 | 0x000 | 8 | 0x1F0 |
+| 1 | 0x1FE | 9 | 0x1EB |
+| 2 | 0x1FC | 10 | 0x1E7 |
+| 3 | 0x1FA | 11 | 0x1E2 |
+| 4 | 0x1F8 | 12 | 0x1DA |
+| 5 | 0x1F7 | 13 | 0x1D2 |
+| 6 | 0x1F4 | 14 | 0x1C0 |
+| 7 | 0x1F2 | 15 | 0x000 (full mute) |
+
+(GF1: `gf1.v` L2806-2821)
+
+**Accumulator Clipping:** The GF1 uses a 21-bit accumulator with explicit clipping to the 16-bit signed range:
+```verilog
+accum_sum = accum_add + sign_extended(val_shifted)
+accum_clip = (positive_overflow) ? 0x7FFF :     // +32767
+             (negative_overflow) ? 0x8000 :     // -32768
+             accum_sum[15:0]
+```
+
+(GF1: `gf1.v` L727-731)
+
+**Key differences from ICS2115:**
+
+| Aspect | GF1 | ICS2115 |
+|--------|-----|---------|
+| Pan resolution | 4-bit (16 positions) | 8-bit (256 positions) |
+| Pan attenuation | 9-bit hardware LUT (16 entries) | `floor(log2(i))` formula (256 entries) |
+| Volume × sample | Hardware multiplier + shift | Software multiply + shift |
+| Accumulator | 21-bit with explicit clip at ±32768 | Stream-managed accumulation |
+| Ramp mechanism | Not visible in GF1 verilog | `state.ramp` 0x00–0x40 amplitude gate |
+| DAC output | Serial MSB-first via shift register | Serial MSB-first (see §1.4) |
