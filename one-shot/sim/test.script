@@ -1,0 +1,60 @@
+# ICS2115 Test Script — Play 8-bit sample from ROM
+# ROM: pgm_m01s.rom (PGM arcade, signed 8-bit PCM samples)
+
+# Select voice 0
+write 0x4F 0x0000
+
+# Set sample bank address = 0 (first 1MB)
+write 0x11 0x0000
+
+# Set oscillator address to byte offset 0x10000
+# acc = 0x10000 << 9 = 0x2000000 → acc[28:21]=0x10, acc[20:13]=0x00
+write 0x0A 0x1000
+write 0x0B 0x0000
+
+# Set loop start = same as current position
+write 0x02 0x1000
+write 0x03 0x0000
+
+# Set loop end = byte offset 0x18000 (32KB of audio data)
+# acc = 0x18000 << 9 = 0x3000000 → acc[28:21]=0x18, acc[20:13]=0x00
+write 0x04 0x1800
+write 0x05 0x0000
+
+# Set frequency control
+# For ~11025 Hz playback at 33075 Hz sample rate:
+# fc = 43 = 0x002B (acc advances ~0.34 bytes per tick)
+write 0x01 0x002C
+
+# Set volume accumulator to maximum
+# volacc index = (vol_acc >> 14) & 0xFFF = 0xFFF for max volume
+# regacc = 0xFFF0 → vol_acc = 0xFFF0 << 10
+write 0x09 0xFFF0
+
+# Set pan to center
+write 0x0C 0x7F00
+
+# Set volume control: done=1 (envelope stopped at current level)
+write 0x0D 0x0100
+
+# Set oscillator config: 8-bit mode, loop enabled
+# bit 2 = eightbit, bit 3 = loop → 0x0C
+write 0x00 0x0C00
+
+# Key on voice 0
+write 0x10 0x0000
+
+# Read status to verify
+read 0x00
+
+# Wait for ~200ms of audio (10M cycles at 50MHz)
+wait 10000000
+
+# Read oscillator address to verify it advanced
+read 0x0A
+
+# Key off voice 0
+write 0x10 0x0F00
+
+# Let the ramp decay (~2ms)
+wait 100000
