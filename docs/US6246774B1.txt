@@ -1,0 +1,3133 @@
+USOO6246.774B1
+
+(12) United States Patent
+
+(10) Patent No.:
+US 6,246,774 B1
+(45) Date of Patent:
+Jun. 12, 2001
+
+Norris et al.
+
+(54) WAVETABLE AUDIOSYNTHESIZER WITH
+
+OTHER PUBLICATIONS
+
+MULTIPLE VOLUME COMPONENTS AND
+TWO MODES OF STEREO POSITONING
+
+OmniWave"M Multimedia Audio, by Samsung Semiconduc
+
+tor, Advance Information, KSO161, pp. 1-8 (Rev. A., Nov.
+1994).
+
+(75) Inventors: David Norris; David N. Suggs, both of
+Austin, TX (US)
+(73) Assignee: Advanced Micro Devices, Inc., DE
+(US)
+(*) Notice: Subject to any disclaimer, the term of this
+
+Digital Oscillator Chip, Integrated Circuit Systems, Inc.,
+
+ICS 1261 (DOC1), pp. 1-12 (Date not available).
+Integrated Circuit Systems, Inc., Digital Sound Generator
+
+(DOC II), ICS1399, Package of Technical Information (Date
+not available).
+Digital Sound Generator (DOC II), ICS1399, Integrated
+Circuit Systems, Inc., pp. 1-10, 21-42 (Date not available).
+
+patent is extended or adjusted under 35
+
+U.S.C. 154(b) by 0 days.
+
+ES5506 “OTTO”, Ensoniq Soundscape TM WaveTable Syn
+
+thesizer, Rev. 2.1, pp. 1-48 (Date not available).
+(List continued on next page.)
+
+(21) Appl. No.: 08/890,133
+(22) Filed:
+Jul. 9, 1997
+
+Primary Examiner Forester W. Isen
+ASSistant Examiner Xu Mei
+
+Related U.S. Application Data
+
+(74) Attorney, Agent, or Firm-Skjerven, Morrill,
+MacPherson, Franklin & Friel, L.L.P., Michael P. Adams;
+
+(63) Continuation of application No. 08/333,389, filed on Nov. 2,
+
+Sam G. Campbell III
+
+(51) Int. Cl." ....................................................... H03G 3/00
+(52) U.S. Cl. ............................................. 381/104; 381/107
+(58) Field of Search .................................... 381/1, 61, 63,
+
+(57)
+
+1994, now abandoned.
+
+A digital wavetable audio synthesizer including a Synthe
+sizer Volume generator. The Volume generator causing a data
+Sample to be multiplied by Volume components that add
+right offset, left offset, and effects volume to the data. The
+left and right offsets provide Stereo field positioning, and the
+effects Volume is used in generating an echo effect. The data
+Sample can be placed in one of Sixteen fixed Stereo pan
+positions, or alternatively the left and right offset values can
+be programmed to place the data anywhere in the Stereo
+field. The Synthesizer includes a register array programmed
+with right and left offset values for providing wavetable data
+with right and left offset volume components. The synthe
+sizer also includes a first Storage device for Storing the right
+offset value, a Second Storage device for Storing the left
+offset value, and multiplication circuitry connected to both
+Storage devices for providing wavetable data with right and
+left offset Volume components based on values Stored in the
+first and Second Storage devices.
+
+381/104, 106, 109, 119; 84/621, 630, 633,
+665, 711, DIG. 27
+(56)
+
+References Cited
+U.S. PATENT DOCUMENTS
+
+3,515,792
+
+6/1970 Deutsch ................................ 84/1.03
+
+4,133,242
+
+1/1979 Nagai et al. .......................... 84/1.13
+
+(List continued on next page.)
+FOREIGN PATENT DOCUMENTS
+
+O 126962.
+O 463 411
+
+12/1984 (EP).
+1/1992 (EP).
+
+O 474 177A2
+
+11/1992 (EP).
+
+0535839
+WO 92/15087
+
+7/1993 (EP) ..................................... 381/104
+3/1992 (WO).
+x7002
+x
+
+ABSTRACT
+
+7 Claims, 158 Drawing Sheets
+
+iFO claia, LFO address
+
+Gala
+data, address WavelefieCS
+lable Wave-table addresses
+data, address Data Si,S2 data
+1026 s
+
+- 1024
+
+toCAi004-interpolate
+MEMORY controlsAddress
+
+:
+:DMA
+
+(law) Aggress Coci
+
+1022
+
+ifaction
+
+Registers
+
+BLS
+
+INTERFACE
+14
+iii.4-
+
+0.08
+
+iGiG
+
+-6) SYNTHESIZER
+
+Wolting -()
+Control
+
+1016
+LOUT ROH EOIt
+8
+left
+Right
+Effects
+
+accliriulato! cCutiliator acclinulator
+Parallel to Serial
+-1020
+1979 ig 18
+Sepial Qui
+ifeiface -025
+-1037
+
+SYAITH DAC-92
+Analog
+left
+
+- 798
+
+-4
+
+-
+
+;
+
+iiO23
+
+& 1021
+
+S data
+-1006
+
+: SYSTEM
+
+FO
+
+generator
+
+Y 1000
+
+Serial
+fansief -540
+Coitri
+
+Analog
+fight
+
+CODEC 4
+
+6
+
+US 6,246,774 B1
+Page 2
+
+“JAZZ16TM CHIPSET.” Media Vision, Inc., pp. 1–52, 1–22,
+
+U.S. PATENT DOCUMENTS
+
+4,201,105
+
+5/1980 Alles ..................................... 84/1.01
+
+4,201,109
+
+5/1980 Kitagawa .............................. 84/1.26
+
+1-14, Schematics, bill of materials, and p. 23 (Date not
+available).
+
+4,344,347
+
+8/1982 Faulkner ............................... 84/1.26
+
+Documentation regarding AVS Group NXPRO16 Chipset
+
+4,471,681
+
+9/1984 Nishimoto ............................. 84/1.23
+
+4,472,993
+4,506.579
+4,508,001
+4,524,668
+4539.885
+4,569,268
+4,573,389
+
+9/1984 Futamase et al.
+... 84/1.24
+3/1985 Rossum ................................. 84/1.01
+4/1985 Suzuki .................................. 84/1.01
+6/1985 Tomisawa et al.
+... 84/1.24
+9/1985 Ezawa ...............
+84/1.25
+2/1986 Futamase et al.
+... 84/1.24
+3/1986 Suzuki .................................. 84/1.26
+
+(Date not available) (9 sheets).
+
+4,622,877
+
+11/1986 Strong ................................... 84/1.01
+
+4,644,840
+
+2/1987 Franz et al. ....
+
+4,649,783
+
+3/1987 Strong et al. ..
+
+... 84/1.01
+
+... 84/1.01
+
+4,719,833
+
+1/1988 Katoh et al. ...
+
+... 84/1.01
+
+4,731,851 * 3/1988 Christopher ...
+
+... 381/104
+
+“OPL3, YMF262, FM Operator Type L3, Yamaha LSI,
+YMF262 Application Manual, Catalog No. LSI-6MF2622,
+
+pp. 1-31 (1992.4).
+“YMZ263, Multimedia Audio & Game Interface Controller
+
+(MMA).” Yamaha LSI, Rev. Jul. 1, 1992, pp. 1-33.
+“YMF262, FM Operator Type L3 (OPL3).” Yamaha LSI,
+Catalog No. LSI-4MF2622, pp. 1-19 (1991.10).
+Preliminary, “YMF278-F(OPL4), 4 Operator FM and Wave
+Synthesis Chip,” Yamaha LSI, Yamaha Corp., Catalog No.
+
+LS1278F, Version 1.01 (Feb. 1, 1993), pp. 1-31.
+
+4,843.938
+4,864,625
+4,916,996
+4,947,723
+
+7/1989 Hideo .................................... 84/1.19
+9/1989 Hanzawa et al. ...................... 381/61.
+4/1990 Suzuki et al. .......................... 84/603
+8/1990 Kawashima et al. .................. 84/603
+
+Semiconductor, Rev. 0.92, pp. 1-23 (Date not available).
+
+4,953,437
+
+9/1990 Starkey .................................. 84/603
+
+4,998.281
+
+3/1991 Sakata .................................... 381/63
+
+tor, Rev. 1.0, pp. 1-15 (Date not available).
+
+“SC18000/SC18005 Multimedia System Controller.” Sierra
+“SC18025 ARIATM Sound Processor,” Sierra Semiconduc
+“SC18050 Aria Basic Sound ROM,” Sierra Semiconductor,
+
+5,111,530
+
+5/1992 Kutaragi et al. ....................... 395/20
+
+5,111,727
+
+5/1992 Rossum .................................. 84/608
+
+Rev 0.91, pp. 1-3 (Date not available).
+
+5,144,676
+5,166,464
+5,187,314
+
+9/1992 Rossum .................................. 84/621
+11/1992 Sakata et al. .......................... 381/63
+2/1993 Kunimoto et al. ..................... 84/630
+
+tor, Rev 1.0, pp. 1-3 (Date not available).
+
+5,194,681
+5,218,710
+5.243,124
+5,300,724
+5,342,990
+5,393,926
+
+3/1993 Kudo ...................................... 84/603
+6/1993 Yamaki et al. ....
+... 395/800
+9/1993 Kondratiuk et al. ................... 84/624
+4/1994 Medovich .............................. 84/604
+8/1994 ROSSum .................................. 84/608
+2/1995 Johnson ................................. 84/610
+
+tor, Rev 1.0, pp. 1-3 (Date not available).
+IBANEZ Model No. DM1000 Block Diagram (Date not
+available).
+
+5,406,022 * 4/1995 Kobayashi .
+5,418,321
+5,440,740
+5,442,127
+
+84/DIG. 27
+
+5/1995 Keller et al. ........................... 84/606
+8/1995 Chen et al. .......................... 395/650
+8/1995 Wachi et al. ........................... 84/603
+
+“SC18051 1/2 Megabyte Sound ROM,” Sierra Semiconduc
+“SC18052 1 Megabyte Sound ROM,” Sierra Semiconduc
+
+Article in “The Music Machine,” Ed. Roads, The Mit Press,
+
+pp. 436–437 (1989).
+“Designing Multi-Channel Reverberators,” by John Staut
+
+ner and Miller Puckette, pp. 569-582 (1989).
+
+5,530,762
+
+6/1996 Jones, Jr. et al. ...................... 381/63
+
+5,613,147
+
+3/1997 Okamura et al. .................... 395/800
+
+“Build a Chorus-Delay,” Chorus, Analog Delay, ADT,
+Flanger, Vibrato, Guitar Player, Jan. 1982, pp. 26-34.
+
+OTHER PUBLICATIONS
+
+Handbook for Sound Engineers (The new audio cyclopedia)
+
+Preliminary Specification, "Stereo continuous calibration
+DAC, TDA1545A, Phillips Semiconductors, pp. 4-212 to
+
+4–229 (Mar. 1993).
+
+Glen Ballow, editor, Howard W. Sams & Company, pp.
+37–38, 158-159 and pp. 626–627, First Edition Third Print
+ing 1988.
+“Proposal for Standardized Audio Interchange Formats,”
+
+Preliminary Product Information," Advanced Music Synthe
+sizer, CS9203,” Crystal Semiconductor Corp., DS117PP1,
+
+IMA Compatibility Project, Version 2.12 (Apr. 24, 1992),
+
+Preliminary Product Information, “Programmable Music
+Processor, CS8905, Crystal Semiconductor Corp.,
+
+berlin, Hayden Book Company, Second Edition (1985),
+
+pp. 1-18 (Aug. 1993).
+
+DS116PP1, pp. 1-19 (Aug. 1993).
+
+Preliminary Product Information, “CDBGMR4 Music Syn
+thesis Eval. Board,” Crystal Semiconductor Corp.,
+
+DS127PP1, pp. 1-24 and schematics (Aug. 1993).
+
+Application Note, “Wave Table MIDI Synthesizer Solutions,
+CS8905 and CS9203,” by Jim Heckroth, Crystal Semicon
+
+ductor Corp., AN26REV1, pp. 1-7 (Aug. 1993).
+
+pp. 1-23.
+“Musical Applications of Microprocessors,"by Hal Cham
+
+Chapters 1, 2, 4, 13, 14, 17 and 19-21.
+U.S. Patent Application Serial No. 072,838, entitled “Wave
+Table Synthesizer,' by Travers, et al.
+John Snell, “Design of a Digital Oscillator Which Will
+Generate Up to 256 Low Distortion Sine Waves in Real
+Time," April 1977, pp. 4-25.
+“SC18024 ARIATM Sound Processor,” Sierra Semiconduc
+
+Application Note, “A Tutorial on MIDI and Music Synthe
+sis, Music Synthesis,” by Jim Heckroth, Crystal Semicon
+
+tor, Rev. 1.0, pp. 1-15 (Date not available).
+
+ductor Corp., AN27REV1, pp. 1-6 (Aug. 1993).
+
+* cited by examiner
+
+U.S. Patent
+
+Jun. 12, 2001
+
+ÁJOu/0/W|207
+
+Sheet 1 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 2 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 3 of 158
+
+US 6,246,774 B1
+
+4
+
+A
+g
+5
+
+ER
+CC
+
+5
+
+AKIO) if
+D12)
+
+2 SDI13)
+
+S
+8
+
+77 :
+
+5
+
+22
+
+62
+
+6
+
+WE #
+
+WS
+WSS
+
+S
+
+RS
+
+I6)
+DIS)
+
+70
+
+WCC
+
+FIG. 3A
+
+U.S. Patent
+
+Sheet 4 of 158
+
+Jun. 12, 2001
+
+US 6,246,774 B1
+
+PinSignal Name
+121 GAMINIO)
+
+122 SATZ
+123SAI6
+124 SA15)
+125
+
+SA4)
+
+126
+2 7|SA(2)
+2
+
+SS
+
+AMIOI1)
+AMI012)
+CC
+
+DI7)
+DI6)
+D15)
+AMIO(3)
+SS
+
+D4)
+QI11)
+RQ112)
+
+FIG. 3B
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 5 of 158
+
+US 6,246,774 B1
+
+Pin
+3
+
+GAMIO3)
+AWSS
+AVSS
+
+GAMI012)
+GAMI011)
+
+GAMI010)
+
+1
+
+1
+
+i:
+
+14 AUX1(L)
+1 MICILl
+15
+
+16
+17 VCC
+18 WSS
+19 UX1(R)
+20 ICIR)
+21 UX2IR)
+22 NEINIR)
+WSS
+23 AVSS
+244
+25
+26 WCC
+27 NEOUTIR)
+28 WSS
+299 LINOUTILI
+30 MONOOUT
+31f ONOlN
+32 WSS
+33 A WCC
+34
+35
+36
+37
+38
+39
+40
+
+500 IWSS
+S
+5
+AIO)
+
+&
+(5a)
+: 555 V
+
+5.i E.s
+
+A.
+
+FIG. 4A
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 6 of 158
+
+f
+
+gnal Name
+
+Signal Name
+
+WCC
+
+SDI11)
+SDI.10)
+
+DAKT7);
+
+SD19)
+
+OMCSh
+RAHLD#.
+RAS#
+MWEif
+
+RA20)
+RA121)
+WCC
+IRQ(15)
+
+RQ112)
+KSELIO)#
+BKSELI1) #
+WSS
+
+BKSEL(2) #
+KSEL(3) #
+RQ11)
+XIAL11
+XIAL10
+WSS
+XIAL20
+XIAL2
+
+MIDIRX
+MIDIX
+32KHZ
+USPEND#.
+BHEff
+
+RQ10)
+AKIO)#
+D(15)
+SD(14)
+SD(13)
+
+DI12)
+
+IRQ12)
+IRQ13)
+
+US 6,246,774 B1
+
+U.S. Patent
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 8 of 158
+
+US 6,246,774 B1
+
+PLUG AND PLAY SABUS
+SA,IOB, IOW.,etc.
+
+125
+CD-ROM
+INTERFACE
+
+CD CS CD DAK
+
+(A)
+CB)
+
+PC AUDIO CHIP
+
+SA11:OSBHE
+7 IRQSIOCHCK
+DRO
+
+130
+
+DAK
+
+CE)
+CE)
+
+\-14
+
+G)
+
+ERGY
+
+CE)
+
+6
+
+138
+
+6 - INTERFACE
+
+IOR, IOW, RESET, AEN, TC
+CHRDY. IOCS16
+
+*48
+
+SYSTEM
+BUS
+
+136
+
+AUDIO CONNECTORS
+
+4 SETS OFSTEREOINPUIS
+CONTROL
+40
+LINEOUTILR
+
+STEREO
+AMP
+
+46
+
+AREF
+
+44
+
+(MICROPHONEAMP MONON - 50
+
+AMP
+56
+
+MONOOut
+
+CK)
+
+REF, CFILT
+
+RESISTER
+
+GAMIN3:O
+GAMIO3:O
+
+MDTX. MIDIRX
+
+CD
+
+GPOUT1:060 |
+64
+SR6.
+66
+
+68
+
+GAME PORT CONNECTOR
+
+FIG. 6A
+
+PORTS
+
+\-62
+
+(V)
+(ND
+-Q
+GP)
+Q)
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 9 of 158
+
+US 6,246,774 B1
+
+/ 124
+
+CD RO, CD DBO
+(B)
+
+84
+82
+
+98
+
+(OBS,
+ME. Alla
+5 BKSEL30)
+7-114
+CE) MA2:O
+
+116
+
+GE) MD7:
+El
+
+96
+
+G
+
+MA10:3)
+DATA7:0
+
+FOUR
+90 CAS3:O
+MA2:O BANKS
+4
+
+RAI" 104
+
+9 LATCH'
+16 BITS
+
+88
+
+RD15:8 RA10:3)
+5 RA12120
+
+GK) PNPCS
+
+/-72
+
+(D. FRSYNC, EFFECT
+
+prov
+
+RA21.19
+Fo2MX16
+RD15:O
+
+a
+
+76
+
+92 RA18:3)
+
+9E9E
+
+LN
+
+O ROMCS
+
+747s
+
+86
+
+nui
+
+78
+
+85
+
+80
+
+SERIAL EPROM
+
+MD2:O
+
+FOR PLUG AND
+
+EXTERNALDSPY74 LPLAYISA
+
+O.C32KHZSUSPEND(PNS
+MUXED WITH FRSYNC
+AND EFFECT).
+NOT AVAILABLE IF AN EXTERNALDSPIS
+UTILIZED)
+\70
+16.9344 MHz
+24,576 MHz
+
+FIG. 6B
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 10 of 158
+
+US 6,246,774 B1
+
+BKSEL3:Oldf | 4 || Output Bank Selects. Used in to Control the CAS
+inputs to each of the DRAM banks Or the
+Output Enable inputs to each of the ROM
+bankS.
+
+C32KHZ/
+EFFECT#
+
+1
+
+input/ Based On the power-up state of RA121), this
+Output pin is eithera Clock input Oran Output to an
+
+external DSP C32KHZ (RAI21) high) is a 32
+KHZ clock used in Suspend mode to Operate
+the refresh Circuitry. EFFECT# (RAI21) low)
+
+becomes active during the Writes to DRAM
+that are for the delay-based effects from the
+Synthesizer.
+SUSPEND# /
+FRSYNC#
+
+1
+
+input/ Based On the p0Wer-up State Of RA121), this
+Output pin is either an input to CauSe Suspend
+mOde Oran Output to an external DSP
+
+SUSPEND# (RAI21) high) is a system
+Control Signal. FRSYNC# (RA211 low)
+becomes active at the beginning of each
+new frame.
+
+MAT 10:3) r
+
+Memory Address. Are the multiplexed row
+Column address bits for DRAM cycles. Are
+the multiplexed RLA 10:3). Outputs and
+DI15:8) inputs for ROM cycles.
+
+MA20)
+
+Memory Address. Are the multiplexed row
+Column address bits for DRAM cycles. Are
+the RLA12, 1,191 Outputs for ROM cycles.
+FIG. 7A
+
+U.S. Patent
+
+Jun. 12, 2001
+
+MDI7:0)
+
+Sheet 11 of 158
+
+US 6,246,774 B1
+
+t Data
+data-buS RLAT18:11)
+bits for DRAM
+cycles.BUS.
+AreArethethe
+multiplexed
+
+Outputs and D17:01 inputs for ROM cycles.
+For serial EPROM accessed, MDI2) is the
+clock, SK. MDI1) is D1 (Serial EEPROM data
+input). MDIO) is DO (Serial EEPROM data
+Output).
+
+Write Enable. Goes to the WEf pin of all
+the DRAM banks, is high during refresh
+
+MWEf
+
+Cycles. During reset, MWE# beCOmes an
+input that is used to select between pin
+Options (see PIN SUMMARY in the general
+description part of this document).
+
+ROM Address. These Outputs provide the
+ROM address during ROM accesses. During
+reset, these become inputs that are used to
+
+RA121:20)
+
+Select between pin Options, See the PIN
+SUMMARY Section of the general
+description for details).
+RAHLD#.
+
+1
+
+Output ROM Address Hold. Used to latch the State
+
+of MDI7:0) (RLA 18:11) and MAI 10:3)
+(RLA10:3) in external latches during ROM
+3CC6SS6S.
+
+RASi
+
+Goes to the RAS# pin Of all the DRAM
+bankS.
+
+ROMCS#
+
+1
+
+ROM Chip Select. Goes to the CSi input to
+all the ROM bankS.
+
+FIG. 7B
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 12 of 158
+
+STFU?OT5SI?ES, ALSTÐIUNTOFT£T£FJEYZET SALSOEDDEUTETOIIFOEJFEXOET DSMS(JMu-01l-10+8)XZdTEIULWTOFITISGIAOEFSETLXI?MUEDIOTETISETAOEFSEALXS®ITEIULWTTOFTIETOJEFEX®
+
+TTLSEºIULºIMWºO-TFIS0E)X,® LOSEIFOUEWTA?ºEO-DFSEJXIZET S|Mu:S_:|-0:_-?FEuIwXTD®ISMEDUITAETOERSFEK? IDLSDETTUETAIOETOSEJFEX®
+
+S/S
+u00
+||
+||I/M||
+0
+9+EXãº
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 21 of 158
+
+US 6,246,774 B1
+
+-142
+RA120,211
+
+C32KHZ #
+
+140
+
+Suspend #
+Effect #
+
+139
+
+FRSync #
+
+C-1
+
+FIG. 11
+
+"Register
+Dai Bus/
+Register Data
+Bus
+
+12
+
+- 152
+Adlib, Sound Blaster,
+
+MiSC - 158 -2
+
+GUS copalility
+
+FunctionS
+
+Interrupt and
+
+DMA Channel
+--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+Interface
+to Register
+Data BuS and
+
+Selection
+
+ISA-Bus Decoding
+
+r me - - - - - as a sa as
+
+- --
+
+- - - - - - - - - - - - a - - - m - - - - all
+
+150
+
+FIG. 12
+
+6 DMARO'S
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 22 of 158
+
+|
+8
+0
+3
+0
+/
+7
+0
+0__-_19/l—†1|0_ _0_
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 23 Of 158
+
+US 6,246,774 B1
+
+-Dala BuS TranSCeiverS
+- - was m r or
+
+182
+
+RDB(7:0)
+
+128
+
+208/IOR#, IOW#
+
+Control and DeCOding Logic
+
+208-/DMA (16,8)
+210
+
+1 90
+
+PNP Logic
+
+and
+
+Registers
+212
+
+FIG. 14A
+
+FIG. 14B
+
+U.S. Patent
+
+—|uZ—-lG—Þu—lWI
+
+—uxw--—19|ezºw
+
+Jun. 12, 2001
+
+Sheet 24 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 25 0f 158
+
+(NII
+|
+dºn
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 27 of 158
+
+US 6,246,774 B1
+
+Wake(X=0) and (CSN=0)
+
+piSEo
+= (0,1)
+
+LOSe ISOlation
+
+PNPSMI1:0)
+pia
+Slee
+
+Wake(X) and (CSN->X)
+
+=(1,0)
+
+Wake(X<>0) and (CSN=X)
+Configuration
+Win ISOlation and
+CSNASSidned
+9.
+
+PNPSMI1:0)
+=(1,1)
+FIG. 17
+
+Wait for Key
+PNPSMI1:0)
+= (0,0)
+
+-Wait-for-Key
+COmmand
+
+-ReSet
+
+U.S. Patent
+
+Jun. 12, 2001
+
+MD12)(SK)
+
+Sheet 28 of 158
+
+US 6,246,774 B1
+
+UUUUUUUUUUUUUUUL
+S
+
+PNPCS(CS)
+
+A7A6 A5
+
+A0
+
+Standby
+
+MDI11(D)- 1 \0/XXXX \ is
+
+MD/OICDO)
+
+is 0/PEP-PS
+
+Even Byte. Odd Byte
+
+FIG. 18
+
+226
+
+16-Bit Shift Register
+
+Serial EEPROM. Data
+
+222
+
+Register Data BuS
+
+St.yte/O) Upper/Lower Byte Mux
+224
+PSEHBITI3:1) A 81 Mux /
+
+PRESDI
+
+220
+
+ISOlation
+
+PrOtOCO
+
+FIG. 19
+
+LOgic
+
+Shift Direction -IOWS to PIDXR
+
+Reset State, 0
+230 1
+
+1
+
+1
+
+0
+
+1
+
+0
+
+1
+
+0
+
+12
+
+U.S. Patent
+
+Jun. 12, 2001
+
+SJÁ
+NSO
+·
+0}
+
+Sheet 29 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 30 of 158
+
+US 6,246,774 B1
+
+9 header
+6 AUDIO logical device
+channel 1 IRQ allocation
+33
+channel 1 DMA allocation
+33
+
+8
+8
+8
+8
+
+- 70 addr (min 220, max 220 length 1)
+- 170 addr (min 226, max 226, length 1)
+
+8
+
+codec I/O address allocation (min 200, max3FF
+length 4, align 4)
+
+6 CD-ROM logical device
+8
+CD-ROM I/O address allocation (min 200, max3FF
+length 16, align 16)
+CD-ROMDMA allocation
+22
+
+374
+
+TOTAL
+FIG. 22
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 32 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 33 of 158
+
+US 6,246,774 B1
+
+FIG. 24A
+
+1.
+16-Bit Cntr
+COUnt EN
+
+Clear
+
+Flip-Flop
+WCC-D
+
+CIOCK / 233
+Enable
+
+O
+
+MSBH-DO->
+240
+
+Clear
+
+Stop CLK
+
+Set
+
+Go CLK
+FIG. 25
+
+232
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 34 of 158
+
+430
+(PCCC1)
+
+US 6,246,774 B1
+
+5*
+
+434
+
+435
+
+D
+
+PCA RST #
+
+441
+
+239-\ CLK6K
+
+GATING LCLK12K
+LOGIC
+242
+
+237
+
+C>O-ICLK 16M
+460
+
+DD-ISUSPRQ
+
+452
+
+448
+
+450
+ISUSPIP
+
+FIG. 24B-1
+
+462
+
+(A)
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 35 0f 158
+
+US 6,246,774 B1
+
+(A)
+
+(B)
+24.576 MHZ
+
+2
+
+3 468
+Do
+
+o(D) P
+(E)
+
+D-l
+
+P
+
+5* IRISUSPRG
+
+(b || 0 Q H0 Q
+t 464
+G)
+O
+O D-2
+PCLOCKPCLOCK
+Ct. 16.9 MHz
+
+LOCAL
+O
+
+O
+
+D
+
+as a
+Q HO
+
+Q
+
+O
+
+O
+
+CLOCK
+
+D
+
+CLOCK
+
+MEMORY
+
+D-12SSUSPRO
+456
+
+I
+
+C
+
+490
+
+2SSUSPIP
+492
+
+16.9 MHZ
+
+484
+
+CO ALLCLOCKS
+CODEC
+PLAYBAC
+PATH
+
+R
+
+SYNTHESIZER
+443
+
+CODEC
+RECORD
+PATH
+
+U.S. Patent
+
+SBH U190 qd
+
+Jun. 12, 2001
+
+SHA
+
+Sheet 36 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 37 Of 158
+
+US 6,246,774 B1
+
+SHA
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 38 of 158
+
+Stop all ClockS
+Operating With the
+MIDI PORTS
+
+Stop all ClockS in
+the CODEC
+
+playback path
+
+Stop all ClockS in
+the CODEC
+
+Record path
+
+FIG.24D-1
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 39 of 158
+
+US 6,246,774 B1
+
+HaS
+
+there been
+
+any Change in the
+Six bitS
+2
+
+12LSUSPRO
+
+Yes
+
+LOCal Memory
+Suspend Request
+
+Wait for 80 usecs
+
+Yes
+
+Shut down the
+
+|2LSUSPPLOCal
+
+ICLK 16ML Feeding
+Local Memory
+
+Memory Suspended
+in PrOdreSS
+IS
+
+Wait for 80 usecs
+
+Yes PWRL High
+2
+
+Snel
+<>
+
+12LSUSPIP goes
+inactive & ICLK
+
+YeS
+
+16M L StartS Ug
+
+GB)
+
+FIG.24D-2
+
+12LSUSPRQ
+i?laCtWegoes
+GE)
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 40 of 158
+
+US 6,246,774 B1
+
+YeS
+
+Wait for 22.7 useCS
+
+|2SSUSPRO
+Synthesizer
+Suspend Request
+
+Y
+6S
+
+|2SSUSPIP
+
+Shut down
+
+Synthesizer
+
+ICLK 16MSS Feeding
+the Synthesizer
+
+in PrOGreSS
+
+Wait for 22.7 usecs
+
+12LSUSPIP
+goes
+inactive & ICLK
+
+Yes / 12LSUSPRQ
+goes
+inactive
+
+16M S StartS up
+
+GE)
+
+FIG.24D-3
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 41 of 158
+
+YeS
+
+Wait for 80 usecs
+
+4.
+
+US 6,246,774 B1
+
+YeS
+
+Run XIA L21 into the 16 bit
+
+COUnter and COunt Out 64K States
+
+YeS
+
+YeS
+
+Ground XTA L20
+
+Re-enable the Various ClOCKS
+
+(16.9 MHz)
+
+to Circuit C
+
+FIG.24D-4
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 42 of 158
+
+US 6,246,774 B1
+
+PWR24, the 24.576 MHz. OSCillator from High to LOW. I2C24SUSPRO
+becomes active immediately and ICLK24M to the Codec module is allowed
+to Clock for at least 100 microSeconds then turned Off. It is stopped Such
+that no glitches are possible, after a trailing edge, it stays low. After the
+Clock is disabled the OScillator is disabled by grounding XTAL10.
+
+PWR24, the 24.576 MHz. OSCillatOr from LOW to High. The OSCillator is
+enabled and a 16-bit COunter is allowed Clock through 64K States to insure
+
+that the Oscillator has Stabilized. Then ICLK24M is allowed to start toggling
+Without the possibility of glitching. At least 100 microseconds after that
+
+I2COSUSPRO iS disabled.
+
+PWRL, LOCal Memory Control Enable from High to LOW. I2LSUSPRO
+becomes active immediately. ICLK16ML is allowed to toggle for at least
+100 microSeconds and then disabled Without the possibility of glitching.
+After ICLK16ML stops toggling, 12LSUSPIP becomes active.
+
+PWRL, LOcal Memory Control Enable from LOW to High. 2LSUSPIP g0eS
+inactive immediately and ICLK16ML is allowed to Start toggling Without the
+possibility of glitching. At least 100 microseconds after that, 12LSUSPRQ
+goes inactive.
+FIG. 26A
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 43 of 158
+
+US 6,246,774 B1
+
+PWRS, Synth Enable from High to LOW. I2SSUSPRO beCOmeS active
+immediately. ICLK16MS is allowed to toggle for at least 100 microSeconds
+and then disabled Without the possibility of glitching.
+
+PWRS, Synth Enable from LOW to High. ICLK16ML is immediately allowed
+to Start toggling without the possibility of glitching. At least 100
+microSeconds after that, 12SSUSPRO goes inactive.
+PPWRI3:Ol. The State of these latches is driven off to their respective
+modules (bit/3) to the ports module and bits/20) to the Codec module) to
+disable clocks and place Circuitry in low-power mode.
+Enter Shut-DOwn Mode. When PPWRI6:1) are all cleared With a single I/O
+Write, then, besides the activity to the individual m00ules described above,
+the 16.9 MHz. OSCillator Will be disabled. This is accomplished by Waiting
+for at least 100 microseconds and then turning aff all Clocks Without
+possibility of glitching. Then the Oscillator is disabled by grounding XIAL20
+
+besides the activity of the individual bits described above, the 16.9 MHz.
+OSCillator Will be re-enabled. First, the OSCillator is re-enabled. XTAL11 iS run
+into a 16-bit COunterto COunt Our 64K StateS before it is aSSumed to be
+
+Stable. At this point, the 16.9 MHz. Clocks to various modules are allowed
+to start tolggling without possibility of glitching. After the Clocks start
+toggling, the bits that have been re-enabled Start their routine, as described
+abOWe.
+
+FIG. 26B
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 44 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+AEN
+
+Jun. 12, 2001
+
+1
+
+Sheet 45 0f 158
+
+US 6,246,774 B1
+
+input Address enable from the ISA bus, used to
+
+distinguish between DMA and I/O cycles.
+C32KHZ
+
+1
+
+input 32KHZ Clock. Suspend-mode refresh Clock
+for local DRAM. This pin Can also be used
+as an output for the LMC's EFFECT# (See
+
+PIN SUMMARY in the general description
+part of this document).
+
+CD CS
+
+Chip Select to the CD-ROM COntroller. This
+can also be used for the external Serial port
+(see PIN SUMMARY in the general
+description).
+
+CD DAK#
+
+DMA acknowlege to the CD-ROM Controller.
+This CanalSO be USed for the eXternal Serial
+
+port (see PIN SUMMARY in the general
+description).
+
+CD DRQ
+
+input DMA request from CD-ROM Controller. This
+CanalSO be used for the eXternal Serial pOrt
+(see PIN SUMMARY in the general
+description).
+Interrupt request from CD-ROM controller
+This CanalSO be USed for the eXternal Serial
+
+port (see PIN SUMMARY in the general
+description).
+FIG. 28A
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 46 of 158
+
+US 6,246,774 B1
+
+DAKT7,65,
+The ISASelectable
+DMA0, acknowledge
+linesforfrom8
+3, 1,0lif I- the
+buS. DAK
+1, and 3 are used
+bit DMA transferS and DAK 5, 6, and 7 are
+USed for 16-bit DMA.
+
+OC The Selectable DMA request lines to the ISA
+Output buS. DRQ 0, 1, and 3 are used for 8-bit
+DMA transferS and DRQ 5, 6, and 7 are
+
+DRQ17,65,
+3,1,0)#
+
+USed for 16-bit DMA.
+
+IOCHRDY
+
+1
+
+OC I/O Channel ready to the ISA bus, used to
+Output generate Wait States.
+
+IOCS16#
+
+1
+
+OC 16-bit Capability indication to the ISA bus.
+Output
+I/O read COmmand from the ISA buS.
+
+IOWif
+
+I/O Write COmmand from the ISA buS.
+
+IRQ115, 12, 11, 7
+7.5,321
+
+OC The Selectable interrupt requests to the ISA
+Output buS.
+
+IOCHK#
+
+1
+
+OC
+
+I/O Channel Check On the ISA bus, used to
+
+Output generate an NMl.
+PNPCS
+
+1
+
+bi-dir Active high Output used as Chip Select for
+the Plug and Play serial EPROM. This is an
+input during reset, its State is latched by the
+
+trailing edge of RESET to determine if the IC
+is in PNP-compliant mode (low) or PNP.
+system mode (high).
+FIG. 28B
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 47 0f 158
+
+OylypeWO I
+T
+
+US 6,246,774 B1
+
+Description
+
+8
+
+RESET
+
+1
+
+ReSet from the ISA buS.
+
+SAI11:0)
+
+12
+
+The 12 IOWer bitS Of the ISA address buS.
+
+SBHEff
+
+1
+
+Byte high enable from the ISA address buS.
+When interfacing to an 8-bit ISA bus, this
+pin must be disconnected.
+
+SDI15:0)
+
+16
+
+ISA data buS.
+
+SUSPEND#
+
+1
+
+input LOW-power Suspend mode. When active, all
+Chip activity becomes frozen, the OSCillators
+are turned Off, C32KHZiS USed to refresh
+
+DRAM, and most of the ISA-bus inputs and
+Outputs are isolated from the IC. This pin
+Can also be used as an Output for the LMC's
+FRSYNC# (see PIN SUMMARY in the
+general description part of this document).
+
+TC
+
+1
+
+input Terminal Count indicates the end of a DMA
+group from the ISA buS.
+
+XIAL11
+
+1
+
+input Crystal 1 input. Input from the 24.576 MHz.
+Crystal.
+
+XTAL 10
+
+1
+
+Output Crystal 1 Ouput. Output to the 24.576 MHz.
+Crystal.
+
+XTAL2
+
+1
+
+input Crystal 2 input. Input from the 16.9344
+MHz. Crystal
+
+XTAL20
+
+1
+
+Output Crystal 2 Output. Output to the 16.9344
+MHz. Crystal.
+FIG. 280
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 48 of 158
+
+f729 918
+
+SMp?98
+
+Z88
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 49 of 158
+
+SHA
+
+Z080863
+
+908
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 50 0f 158
+
+100uS
+
+Suspend-Mode
+Refresh Cycles
+
+C32KHZ
+
+ISUSPRQ#
+
+ISUSPIP#
+
+FIG. 31
+
+Self-Refresh
+
+125 SEC
+Refresh
+
+ISUSPIP#
+
+BKSEL3:0lf (CAS)
+RAS if for 125 uS RSH
+RAS; for 62 ISRSH
+RASf for Self-lined RSH
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 51 0f 158
+
+US 6,246,774 B1
+
+CLK
+
+RASlf
+
+BKSEL(3:01:#
+
+MA|10:0).
+
+ME
+MBTAR
+MDI7:ORD
+
+lar
+
+/
+
+K ROW x
+
+COLUMN
+
+EH
+O
+
+FIG. 34A
+
+CLK
+RASh
+
+BKSEL3:0) if
+MA(10:0)
+MWEff
+MDI7:0/WR
+
+or
+who
+x ROW X COLEVENIX COLUMNODD
+torner
+(LOWBYTEX
+HIGH BYTE
+
+MDI7:ORD
+
+(
+
+)-
+
+LOW BYTE
+
+FIG. 34B
+CLK
+RAS#
+
+BKSEL(3:01#
+MWEff
+
+FIG. 34C
+
+)
+
+HIGH BYTE
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 52 0f 158
+
+US 6,246,774 B1
+
+16.9 MHz
+RA121:20
+
+V
+
+a
+
+MA(2,1,0)
+MAT10:3)
+MDI7:0)
+BKSEL(3:01:#
+RAHLDif
+
+ROMCSi
+MWEff
+FIG. 35
+
+Register Data BuS
+
+12
+
+FIFOACCeSS
+
+FIFO Size SEL
+
+(LMFSI)
+
+321
+
+FIG. 36
+
+328
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 53 0f 158
+
+US 6,246,774 B1
+
+SYSTEMMEMORY
+
+LOCAL MEMORY
+
+SAMPLE 1, TRACK 1
+SAMPLE 1, TRACK2
+SAMPLE 1, TRACK 3
+
+SAMPLE 1, TRACK 1
+SAMPLE 2
+SAMPLE 3.
+
+SAMPLE 1, TRACK2
+SAMPLE 2
+SAMPLE 3.
+
+SAMPLE 1, TRACKn
+
+SAMPLE 1, TRACK 3
+
+SAMPLE2, TRACK 1
+SAMPLE2, TRACK2
+SAMPLE2, TRACK 3
+
+SAMPLE 2
+SAMPLE 3.
+
+SAMPLE2, TRACKn
+SAMPLE 1, TRACKn
+SAMPLE 2
+SAMPLE 3.
+
+FIG. 37
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 54 of 158
+
+DAM Sample
+
+US 6,246,774 B1
+
+Description
+
+Chan
+
+Size
+
+8-bit
+
+8-bit Each DMA request-acknowledge cycle transferS One
+byte that is placed in the Current track number, the
+track number increments With each byte
+tranSferred.
+
+16-bit Each DMA request acknowledge Cycle transfers two
+bytes that are placed at the Current track number
+the traCk number in CrementS With each 16-bit Value
+transferred.
+
+Each DMA request-acknowledge Cycle transferS tWO
+bytes, the lower byte is placed in the Current track
+
+16-bit
+
+number, the traCk number iS inCremented and the
+
+upper byte is placed in that track, the track number
+is then incremented again.
+16-bit
+
+16-bit
+
+Each DMA request-acknowledge cycle transferS One
+16-bit value that is placed in the Current track
+number, the track number increments with each
+16-bit Value transferred.
+FIG. 38
+
+U.S. Patent
+
+Jun. 12, 2001
+
+70d 1SH
+
+Sheet 55 0f 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+099
+
+998
+
+Sheet 56 of 158
+
+88
+
+US 6,246,774 B1
+
+U.S. Patent
+
+372
+3763
+
+Jun. 12, 2001
+
+Sheet 57 Of 158
+
+JoyStick 1
+
+JoyStick 2
+
+XPOtentiometer
+r
+
+XPOtentiometer
+
+37a-- Y Potentiometer
+3803
+
+US 6,246,774 B1
+
+Y Potentiometer
+
+376b
+
+7,
+
+380b
+
+Button
+Button 21
+
+Button 11,
+
+Button 2
+
+GAMINI3:01
+GAMIO3:0)
+PC Audio Chip
+System Configuration
+FIG. 40
+
+/
+
+374
+
+Changing the Gain at Zero
+740 MinimizeS DiSCOntinuitieS
+
+U.S. Patent
+
+Jun. 12, 2001
+
+WCC
+
+Sheet 58 0f 158
+
+US 6,246,774 B1
+
+Joystick
+
+396 Joystick
+
+392
+
+Trim DAC
+
+Irin DAC
+
+f
+
+402
+
+Register
+
+/ GAMO
+
+376,378
+
+i>
+404
+
+GAMIO
+
+A.
+394
+
+Game
+
+COntrOl
+Flip-Flop
+
+COntrol
+Register
+COntrol
+
+JoyStick
+
+398
+
+PC Audio Chip
+
+YC
+
+FIG. 41A
+
+GAMIO Ground
+
+Ground
+IranSition
+
+Voltage CrOSSes JoyStick
+Trim DAC ThreShOld
+
+Digital Value of GAMIO
+Bit as Reported to CPU
+Via Game Control Reg
+FIG. 41B
+
+390
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 59 of 158
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 62 of 158
+
+LO
+Q>
+|
+
+FIG. 45B-1
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 63 of 158
+
+FIG. 45B-2
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 64 of 158
+
+US 6,246,774 B1
+
+728
+
+526 NRegister
+
+RD Buffer
+
+Ella | -------------716-N Register
+SeleCt
+DeCOOle
+718
+
+25 MilliSeC
+Timer
+
+720
+
+100 to 300
+MiCrOSeC Timer
+
+i.e.
+BIOCK
+
+715 /
+FIG. 47
+
+Detect
+
+710 ;
+
+Comparator
+POWer-On COntrol
+
+738
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 66 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+US 6,246,774 B1
+
+Sheet 68 0f 158
+
+899
+099 Z99
+
+U.S. Patent
+
+Jun. 12, 2001
+
+834
+
+Sheet 69 of 158
+
+836 - 814
+
+US 6,246,774 B1
+
+- 838 - 816
+
+- 840 - 802 - 842
+
+INTERP 2 / INTERP 3
+
+Noise || 1 Bit
+
+SinC 5
+
+Shaper
+
+SinC2
+
+Out
+
+INTERP 1
+
+Phase 24832
+2X fS
+
+4X fS
+
+Front end Of DAC 514
+FIG. 52
+
+64 X fs
+
+64 X fS
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 70 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 71 of 158
+
+US 6,246,774 B1
+
+||
+
+- we -- - - - - - - - - - - e.
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 72 of 158
+
+-- - -- -
+
+-
+
+m wirm - - - -
+
+US 6,246,774 B1
+
+||
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 73 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 74 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+US 6,246,774 B1
+
+Sheet 75 of 158
+
+091S/1e40Zl/l1e1?S
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 76 of 158
+
+Interpolator 2 Stage
+FIG. 57
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 77 Of 158
+
+US 6,246,774 B1
+
+Response of sinc 5 Interpolator
+
+0
+
+fS/2
+
+fS
+
+Frequency
+FIG. 58
+
+2kfS
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 78 of 158
+
+US 6,246,774 B1
+
+IN BAND ROLLOFF (dB)
+
+-1
+
+dB
+
+-3
+
+0
+
+Frequency
+FIG. 59
+
+0.45*fS
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 79. Of 158
+
+Interpolator 3 Stage
+FIG. 60
+
+Interpolator 3 Stage
+FIG. 61
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 80 0f 158
+
+WII]||||||||||||||||
+09
+
+8lp
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 81 of 158
+
+US 6,246,774 B1
+
+00?|700€|00300
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 82 of 158
+
+US 6,246,774 B1
+
+J9SdIeO?SN
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 83 of 158
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 84 of 158
+
+US 6,246,774 B1
+
+S
+
+SCS
+S
+
+OM CMo
+
+N
+
+SS
+SS
+SS
+
+dis QS
+
+3S
+S U.
+
+S. N.
+
+e
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 85 of 158
+
+US 6,246,774 B1
+
+2 k 1 06
+
+0
+
+-2*106
+-2*106
+
+0
+2 * 106
+Real Part of Complex Freq.
+FIG. 65
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 86 of 158
+
+US 6,246,774 B1
+
+s
+
+T
+I
+NI
+
+th
+
+I
+
+s
+
+s
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 88 of 158
+
+I
+I
+NI
+H
+I.
+III
+\
+
+N
+
+Y
+
+s
+s
+
+NQ
+vr
+
+&
+
+N. N.
+SS
+SNC
+S Oo
+S NS
+
+S
+
+S $2.
+Ys
+
+SY
+
+N
+
+N
+
+O vs. CN cy
+
+US 6,246,774 B1
+
+-x
+
+- - - - - -- - - -
+
+S & s S. s s s s s s
+
+S
+-k
+
+co
+
+CY
+
+O
+
+OO
+CS)
+
+S.
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 89 of 158
+
+1. Unit Circle
+
+e Ideal Zer0S
+
+O Realizable Zeros
+
+FIG. 69
+
+US 6,246,774 B1
+
+U.S. Patent
+
+US 6,246,774 B1
+
+U.S. Patent
+
+Jun. 12, 2001
+
+US 6,246,774 B1
+
+Sheet 91 of 158
+
+ç01
+xã
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 92 of 158
+
+US 6,246,774 B1
+
+S
+
+s
+s
+
+s
+S
+
+U.S. Patent
+
+Sheet 93 of 158
+
+9.01
+98
+×
+ž
+
+(Spu038S) aul I
+
+U.S. Patent
+
+0
+
+Jun. 12, 2001
+
+10000
+
+20000
+
+Sheet 94 of 158
+
+30000
+
+40000
+
+US 6,246,774 B1
+
+50000
+
+Bandwidth (Hz) for fs=3.072 MHz - B
+-H 1.5
+
+-O- 1.71 (Amax = 0.4)
+-O- 1.80 (Amax = 0.2)
+-o- 1.9 (Unstable With A = 0.0002)
+FIG. 74
+
+60000
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 95 of 158
+
+US 6,246,774 B1
+
+se
+
+M
+MT
+N
+
+N
+N
+INI
+
+S S. rO 3 cQ s CNG S tO S
+Xeu/
+
+s
+S
+
+s NC
+s
+
+s
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 96 of 158
+
+US 6,246,774 B1
+lc)
+
+Y
+
+NT
+
+S.
+
+N
+N
+
+S
+
+S
+
+S
+
+CN
+
+l
+on
+
+"N
+
+Oo
+
+wr.
+
+N
+
+"N.
+
+Co
+
+tr.
+
+lo
+
+N T CYo
+
+N.
+
+wn
+
+yule) 8SION
+
+as
+
+YN
+
+N
+
+is
+
+S
+
+s
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 97 of 158
+
+US 6,246,774 B1
+
+0.02
+
+0.01
+
+00
+
+50
+
+Coeff. Index
+
+FIG. 77
+
+100
+
+U.S. Patent
+
+Jun. 12, 2001
+
+Sheet 98 0f 158
+
+US 6,246,774 B1
+
+s
+
+

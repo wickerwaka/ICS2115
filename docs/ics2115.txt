@@ -1,0 +1,1853 @@
+ICS2115
+
+Integrated
+Circuit
+Systems, Inc.
+
+WaveFront Synthesizer
+General Description
+
+Features
+
+The WaveFront Synthesizer, ICS2115, is an audio synthesis
+chip which utilizes wavetable lookup to produce 16-bit, CD
+quality sound. The internal memory management unit allows
+both ROM, for standard samples, and low cost DRAM, for soft
+loadable samples, to be connected directly to the ICS2115. The
+WaveFront Synthesizer presents the audio output in 16-bit
+linear form for conversion by a low cost CD-type DAC.
+
+•
+•
+•
+•
+•
+•
+
+Capable of addressing up to 32 MB of wavetable ROM
+and up to 16 MB of wavetable DRAM
+Variable Polyphony Rates: 24 voices at 44.1 kHz through
+32 voices at 33.8 kHz
+Uses 16 bit linear, 8 bit linear, and 8 bit u-Law wavetable
+data
+Serial output for a CD player-type DAC
+Capable of using either a 68EC000 (with the ICS2116) or
+an ISA-based host for software control
+Part of a complete design package that includes software
+drivers for Windows and DOS
+
+Applications
+•
+•
+•
+•
+
+Block Diagram
+
+DD<7:0>
+
+XTLI
+
+ROMA<17:9>
+MA<10:0>
+ROMEN
+BYTE
+RAMACK
+RAS*
+CAS*<3:0>
+WE*
+
+Wave Table
+Memory
+Interface
+
+RAMREQ*
+
+SD<15:0>
+SA<1:0>
+IOR*
+IOW*
+CS*
+CSMM*
+DACK*
+TC
+RESET*
+SBHE*
+
+ISA based sound cards
+Wavetable synthesizer daughter cards
+External sound modules that connect to a PC’s serial or
+parallel port
+Any system requiring a self contained unit that provides
+high quality music synthesis of General MIDI sounds, in
+a low cost design
+
+Host
+Interface
+
+Synthesis
+Engine
+
+DAC
+Interface
+
+SERDATA
+LRCLK
+BCK
+WDCLK
+
+DRQ
+IOCH16*
+MMIRQ
+IRQ
+IOCHRDY
+CLOCK
+
+XTLO
+
+WaveFront is a trademark of Integrated Circuit Systems, Inc.
+ICS2115fullRevB072694
+
+ICS2115
+Pin Configuration
+
+ICS2115
+
+84-Pin PLCC
+
+ICS2115
+
+100-Pin TQFP
+2
+
+ICS2115
+Pin Descriptions
+PIN NUMBER
+6-10, 12-17
+69-77
+1-3, 84
+61-68
+4
+5
+78
+79
+20
+19
+27-32, 34-39
+40-41
+44
+45
+42
+54
+47
+48
+53
+49
+50
+52
+56
+55
+46
+57
+58
+59
+60
+81
+82
+11, 51
+18, 83
+33, 80
+25, 26, 43
+
+PIN NAME
+MA<10:0>
+ROMA<17:9>
+CAS<3:0>
+DD<7:0>
+RAS
+WE
+ROMEN
+BYTE
+RAMREQ
+RAMACK
+SD<15:0>
+SA<1:0>
+IOR
+IOW
+SBHE
+IOCS16
+CS
+CSMM
+DRQ
+DACK
+TC
+IOCHRDY
+IRQ
+MMIRQ
+RESET
+SERDATA
+LRCK
+WDCK
+BCK
+XTLO
+XTL1
+VDD
+VDDP
+VSS
+VSSP
+
+TYPE
+TPUP2
+O
+O2
+B
+O2
+TPUP
+O
+O
+IPUP
+O
+B
+I
+I
+I
+IPUP
+SINK
+I
+I
+SOURCE
+I
+I
+SINK
+B2
+SOURCE
+IPUPS
+O
+O
+O
+O
+O (special)
+I (special)
+PWR
+PWR
+GND
+GND
+
+DESCRIPTION
+Wavetable Muxed Address Bus.
+Wavetable ROM Address.
+Wavetable DRAM Column Address Strobe.
+Wavetable Data Bus.
+Wavetable DRAM Row Address Strobe.
+Wavetable DRAM Write Enable.
+Wavetable ROM Enable/Byte Enable.
+Wavetable ROM Byte Mode.
+Wavetable DRAM cycle request.
+Wavetable DRAM cycle acknowledge.
+Host Interface Data Bus.
+Host Interface Address Bus.
+Host Interface Read Strobe (Active Low).
+Host Interface Write Strobe (Active Low).
+Host Interface Sixteen Bit Hardware Enable.
+Host Interface I/O Channel Sixteen Wide.
+Host Interface Synthesizer Chip Enable.
+Host Interface Chip Select for MIDI Interface Emulation.
+Host Interface DMA Request.
+Host Interface DMA Acknowledge.
+Host Interface DMA Terminal Count.
+Host Interface I/O Channel Ready.
+Host Interface Synthesizer IRQ.
+Host Interface MIDI IRQ.
+Hardware Reset (Active Low).
+Serial Data Output.
+Left/Right Clock.
+Word Clock.
+Bit Clock.
+Crystal or N/C.
+Crystal or Clock Input.
+Power for chip core.
+Power for pad ring.
+Ground for chip core.
+Ground for pad ring.
+
+3
+
+ICS2115
+Pin Type Descriptions
+PIN
+TYPE
+I
+IPUP
+IPUPS
+O
+O2
+B
+B2
+TPUP
+TPUP2
+
+INPUT
+TYPE
+TTL
+TTL
+SCHMIDT
+n/a
+n/a
+TTL
+SCHMIDT
+n/a
+n/a
+
+DRIVE
+none
+none
+none
+standard
+high
+standard
+standard
+standard
+medium
+
+PULLUP
+R
+none
+yes
+yes
+none
+none
+none
+none
+yes
+yes
+
+PULLDOWN R
+none
+none
+none
+none
+none
+none
+yes
+none
+none
+
+SINK
+SOURCE
+PWR
+GND
+
+n/a
+n/a
+n/a
+n/a
+
+standard
+standard
+n/a
+n/a
+
+yes
+none
+none
+none
+
+none
+yes
+none
+none
+
+NOTES
+TTL Input.
+TTL Input with pull-up.
+SCHMIDT Input with pull-up.
+Output.
+High Drive Output (200pF max load).
+TTL Bi-directional.
+Drive only with pull-up.
+Tristate with pull-up.
+Tristate (medium drive) with pull-up
+(125pF max load).
+Drive low only with pull-up.
+Drive high only with pull-down.
+Power terminal.
+Ground terminal.
+
+Absolute Maximum Ratings
+Supply Voltage . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . -0.5V to 7.0V
+Logic inputs . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . -0.5V to VDD + 0.5V
+Ambient operating temp. . . . . . . . . . . . . . . . . . . . . . . 0°C to 70°C
+Storage temperature . . . . . . . . . . . . . . . . . . . . . . . . . . -65°C to 150°C
+Stresses above those listed under Absolute Maximum Ratings may cause permanent damage to the device. This is a stress rating
+only and functional operation of the device at these or any other conditions above those indicated in the operational sections of
+the specifications is not implied. Exposure to absolute maximum rating conditions for extended periods may affect product
+reliability.
+
+4
+
+ICS2115
+DC Electrical Characteristics
+VCC = 5.0V ± 10%; GND = 0V; TA = 0°C to 70°C
+PARAMETER
+SYMBOL
+TEST CONDITIONS
+Supply Voltage
+VDD
+TTL Input Voltage Low
+VIL
+TTL Input Voltage High
+VIH
+Schmidt Input Voltage Low
+VILS
+Schmidt Input Voltage High
+VIHS
+XTLI Input Voltage Low
+VILX
+XTLI Input Voltage High
+VIHX
+Output Low Current
+IOL
+VOL=0.4V
+Standard Drive
+VOH=2.8V
+Output High Current
+IOH
+Standard Drive
+VOH=0.4V
+Output Low Current
+IOL2
+Medium Drive
+Output High Current
+IOH2
+VOH=2.8V
+Medium Drive
+VOH=0.4V
+Output Low Current
+IOL3
+High Drive
+Output High Current
+IOH3
+VOH=2.8V
+High Drive
+VSS < VIN < VDD
+Input Leakage Current
+IIN
+Standard Inputs
+VIN = VSS
+Pull-up Current
+IPUP
+Pull-down Current
+IPDN
+VIN = VDD
+XTLI Input/
+CXTL
+Output Capacitance
+
+MIN
+4.75
+-0.30
+2.20
+-0.30
+3.00
+-0.30
+3.50
+4.0
+
+6.0
+
+-4.0
+
+mA
+mA
+
+-6.0
+
+12.0
+-12.0
+
+-1.0
+15.0
+50.0
+
+UNITS
+V
+V
+V
+V
+V
+V
+V
+mA
+
+9.0
+-9.0
+
+9.0
+
+MAX
+5.25
+0.80
+VDD+0.30
+1.50
+VDD+0.30
+1.50
+VDD+0.30
+
+6.0
+-6.0
+
+Note: All pins have a maximum capacitive load of 50pF unless noted otherwise.
+
+5
+
+TYP
+5.00
+
+30.0
+90.0
+20.0
+
+mA
+mA
+
+-9.0
+
+mA
+
+1.0
+
+uA
+
+50.0
+150.0
+
+uA
+uA
+pF
+
+ICS2115
+AC Electrical Characteristics
+Please reference the timing diagram titled Host Interface Timing, below.
+HOST INTERFACE AC TIMING PARAMETERS
+PARAMETER
+Address setup to command
+Chip select setup to command
+Address hold from command
+Chip select hold from command
+Command width
+Address valid to /IOCS16 delay
+IOCS16 hold from address invalid
+Write data setup
+Write data hold
+Read data delay (ready access)
+Read data hold
+DACK setup to command
+DACK hold after command
+TC setup to command
+TC hold after command
+TC width
+
+SYMBOL
+tAS
+tCS
+tAH
+tCH
+tCW
+tAID
+tIH
+tDS
+tDHW
+tDD
+tDHR
+tDAS
+tDAH
+tTS
+tTH
+tTW
+
+FROM
+3
+5
+2
+2
+1
+3, 5
+4, 6
+14
+2
+1
+2
+16
+2
+18
+2
+18
+
+6
+
+TO
+1
+1
+4
+6
+2
+7
+8
+2
+15
+12
+13
+1
+17
+2
+19
+19
+
+MIN
+10
+10
+10
+10
+100
+0
+0
+50
+10
+0
+0
+20
+50
+25
+n/a
+20
+
+MAX
+50
+50
+60
+20
+-
+
+UNITS
+nS
+nS
+nS
+nS
+ns
+nS
+nS
+nS
+nS
+nS
+nS
+nS
+nS
+nS
+nS
+nS
+
+ICS2115
+Timing Diagrams
+
+SA,SBHE*
+
+3
+
+4
+
+CS*,CSMM*
+
+5
+
+6
+1
+
+IOR*,IOW*
+
+2
+
+7
+
+IOCS16*
+
+8
+9
+
+IOCHRDY
+
+10
+
+11
+
+SD (Read)
+
+12
+
+13
+14
+
+SD (Write)
+
+15
+
+16
+
+DACK*
+
+17
+18
+
+TC
+
+19
+
+Host Interface Timing
+1
+
+8
+
+16
+
+24
+
+BCK
+15 Left (MSB)
+
+SERDATA
+
+14
+
+13
+
+12
+
+11
+
+10
+
+9
+
+8
+
+7
+
+6
+
+5
+
+4
+
+3
+
+2
+
+1
+
+0
+
+WDCK
+LRCK
+24
+
+32
+
+40
+
+48
+
+BCK
+SERDATA
+
+1
+
+0
+
+15 Right (MSB)
+
+14
+
+13
+
+12
+
+11
+
+10
+
+9
+
+WDCK
+LRCK
+
+Notes:
+- BCK is XTLI frequency divided by four
+- ‘Extra’ cycles are appended as needed for the number of voices
+- BCK continues to run for all ‘extra’ cycles
+
+DAC Output Timing
+7
+
+8
+
+7
+
+6
+
+5
+
+4
+
+3
+
+2
+
+1
+
+0
+
+ICS2115
+
+XTLI/2
+RAS*
+CASn*
+CAS3*
+MA<10:0>
+WE*
+DD (out)
+ROMA<17:9>
+ROMEN
+(ONLY ONE ACTIVE)
+
+BYTE
+
+Refresh
+
+Synth 1
+
+Synth 2
+
+8 Bit/u-Law Access of Wavetable ROM
+
+XTLI/2
+RAS*
+CASn*
+CAS3*
+MA<10:0>
+WE*
+DD (out)
+ROMA
+HIGH BYTE
+
+ROMEN
+LOW BYTE
+
+BYTE
+
+Refresh
+
+HIGH BYTE
+
+LOW BYTE
+
+Synth 1
+
+Synth 2
+
+16 Bit Access of Wavetable ROM
+
+8
+
+ICS2115
+
+XTLI/2
+RAS*
+CASn*
+CAS3*
+MA<10:0>
+
+(HIGH IMPEDANCE)
+
+WE
+
+(HIGH IMPEDANCE)
+
+DD (out)
+ROMA<17:0>
+ROMEN
+BYTE
+
+Refresh
+
+Synth 1
+
+Utility
+
+Synth 2
+
+8 BIt/u-Law Access of Wavetable DRAM
+
+SYNTH 16 Bit DRAM Access
+XTLI/2
+RAS*
+CASn*
+CAS3*
+MA0
+
+MA0
+
+MA<10:0>
+
+(HIGH IMPEDANCE)
+
+WE
+
+(HIGH IMPEDANCE)
+
+DD (out)
+ROMA<17:0>
+ROMEN
+BYTE
+
+Refresh
+
+Synth 1
+
+Utility
+
+Synth 2
+
+16 Bit Access of Wavetable DRAM
+
+9
+
+ICS2115
+CSMM
+
+Miscellaneous Pins
+
+This input pin selects read/write access to the Media Master and
+MIDI interface emulation registers, as selected by SA<1:0>.
+This signal must be stable before, during, and after IOR or IOW
+strobes.
+
+VDD, VDDP
+These are the chip power supply pins. VDD pins power the core
+logic, while VDDP pins power the pad ring. This arrangement
+helps prevent switching spikes due to output transitions from
+disturbing the internal operation of the chip. These pins MUST
+be at the same potential externally.
+
+SA<1:0>
+These address input pins select one of four direct mapped
+registers as determined by the CS and CSMM pins. These
+signals must be stable before, during, and after IOR or IOW
+strobes.
+
+VSS, VSSP
+These are the chip ground pins. VSS pins ground the core logic,
+while VSSP pins ground the pad ring. This arrangement helps
+prevent switching spikes due to output transitions from disturbing the internal operation of the chip. These pins MUST be at
+the same potential externally.
+
+SBHE
+This input pin determines the access width for even addresses,
+and is ignored for odd addresses. It should be connected directly
+to the ISA bus for a 16-bit card. For 8-bit cards, it should be
+tied high.
+
+XTLI, XTLO
+These pins comprise a self-contained oscillator circuit for primary chip clock generation. No external components (other
+than the crystal itself) are required for fundamental mode
+operation. There is approximately 20pF of capacitance at each
+pin, and a DC bias feedback between the pins for startup and
+biasing. The standard crystal frequency is 33.868800 MHz (for
+24 oscillators at 44.1 kHz or 32 oscillators at 33.8 kHz). Due
+to the expense of fundamental mode crystals of this frequency,
+the oscillator can be operated in 3rd overtone mode with the
+addition to the XTLO pin of a series network to ground of a
+1.0H inductor and a 0.001F capacitor. In this case, the crystal
+fundamental frequency will be 11.2896 MHz.
+
+This output pin indicates to the host that the current address is
+accessible as a word-wide (sixteen bit) data entity. It is based
+on the current value of the indirect register address, SA<1:0>,
+and CS selecting a word-wide internal register. Under these
+conditions, IOCS16 drives low; otherwise, it is a resistive high.
+This output pin is unused with systems that contain the
+ICS2116. IOCS16 requires an external pull-up of 3.3K.
+
+When an external clock is supplied, XTLO should be left
+floating. XTLI should be connected to the clock source via a
+series capacitor (0.001uF is recommended). Duty factor is not
+critical, since the clock is internally divided by two.
+
+IOR
+
+IOCS16
+
+SD<15:0>
+This is the bi-directional data bus used for all register data
+transfers.
+
+This input pin is used to read registers when low. SA<1:0>, CS,
+CSMM, and SBHE must be stable before, during, and after the
+active low pulse on IOR.
+
+Host Interface
+
+IOW
+
+The ICS2115 can interface with the ISA bus or directly with
+the ICS2116. For more information, refer to the WaveFront
+Application Notes. (Please reference the timing diagram titled
+Host Interface Timing, above.)
+
+This input pin is used to write registers when low. SA<1:0>,
+CS, CSMM, and SBHE must be stable before, during, and after
+the active low pulse on IOW. SD<15:0> must be stable before,
+during, and after the trailing (rising) edge of /IOW.
+
+CS
+
+IOCHRDY
+
+This input pin selects read/write access to the internal indirect
+registers, as selected by SA<1:0>. This signal must be stable
+before, during, and after IOR or IOW strobes.
+
+This output pin is normally in a resistive pull-up state. During
+IOR or IOW low times, this pin can become active (drive low)
+to indicate to the host that the requested data transfer is not
+ready, and that IOR or IOW should be held (stretched) until
+ready is signaled by IOCHRDY deactivating (resistive high).
+IOCHRDY requires an external pull-up of 3.3K.
+
+10
+
+ICS2115
+DACK
+
+DAC Output
+
+This input, when low, identifies the current IO operation as a
+DMA acknowledge operation. The current IO operation will
+interact with the DMA control logic in the ICS2115 as programmed, and cause DRQ to be de-asserted. This input must
+be held before, during, and after the IO command signal (IOR
+or IOW low).
+
+The ICS2115 is designed to directly interface with consumer CD player type digital to analog converters. The
+interface is a 48 clock, MSB first, left/right multiplexed
+data stream. Depending on the number of oscillators enabled, there will be additional idle clocks generated after
+the data is output. (Please reference the timing diagram
+titled DAC Output Timing, above.)
+
+TC
+This input (along with DACK being low) signals that the
+current DMA operation is the last transfer, and that the ICS2115
+should shutdown its DMA logic after the current transfer is
+complete.
+
+Some DACs that may be used are:
+•
+•
+
+DRQ
+
+Phillips TDA1545
+NEC UDP6376
+
+BCK
+
+This output pin is normally in a resistive low state. When DMA
+operation has been programmed and the proper status exists,
+the DRQ pin will drive high to indicate that the ICS2115 is
+ready to accept a DMA data transfer. Upon receipt of a low on
+the DACK input, DRQ will return to the resistive low state.
+When the ICS2115 is ready to continue DMA transfers, DRQ
+will again be asserted. This sequence repeats until DMA is
+terminated by either TC or a register write. DRQ requires an
+external pull-down of 1K.
+
+This output pin is the bit clock for the DAC. The frequency
+of BCK is the frequency of XTLI divided by four. It
+always runs, even when the system has not initialized
+itself. The other DAC interface signals change on the
+falling edge of BCK, and are stable on the rising edge of
+BCK.
+
+SERDATA
+This output is the accumulated data of all ICS2115 oscillators, presented as signed binary two’s complement data,
+MSB first. The internal 16 bit data is sign-extended to 24
+bits, and presented left then right.
+
+MMIRQ
+This output is normally in a resistive low state. Whenever an
+active Media Master interrupt occurs, it will drive high. When
+the interrupt condition is cleared, the pin returns to a resistive
+low state. MMIRQ requires an external pull-down of 1K.
+
+LRCK
+LRCK indicates the stereo channel of the data just shifted
+out. It will transition high to low after bit 0 of the left data
+has been output, and transition low to high after bit 0 of
+the right data has been output.
+
+IRQ
+This output is normally in a resistive low state. Whenever an
+active internal interrupt occurs, it will drive high. When the
+interrupt condition is cleared, the pin returns to a resistive low
+state. IRQ requires an external pull-down of 1K.
+
+WDCK
+WDCK indicates the framing of the data being shifted out.
+It will transition low to high between bits 12 and 11 of
+both the left and right data words. It transitions high to low
+after bit 0 of both the left and right data words.
+
+RESET
+This input is the active low hardware reset for the ICS2115.
+
+11
+
+ICS2115
+RAS
+
+Wavetable Memory Interface
+(Please reference the timing diagrams that show the wavetable
+memory access cycles, above.) The ICS2115 is designed to
+directly interface to the following memory components:
+
+This output connects to the RAS pin of all wavetable DRAM
+chips RAS is generated for all DRAM access and refresh
+cycles, and remains high for all ROM cycles so that the /CAS
+pins can be used as ROM addresses.
+
+•
+
+WE
+
+dynamic RAM meeting the following parameters:
+• 80nS access time
+• Fast Page mode operations
+• CAS-before-RAS auto-refresh
+• 256K (9 addresses) to 4M (11 addresses) by 1 or 4
+(configured as byte wide)
+
+This tristate output connects to the WE pin of all wavetable
+DRAM. It is normally in a driven (or resistive) high state. It
+toggles low only for DMA write cycles.
+
+ROMA<17:9>
+This bus provides addresses for ROM based oscillators. During
+refresh and DRAM cycles, these pins are driven high. The
+MA<10:0> and CAS<3:0> multiplex to provide the other address bits for the wavetable ROM. The table below shows the
+exact relation.
+
+SIMM’s with an access time better than 80ns can also be used.
+•
+
+ROM meeting the following parameters:
+• 150nS address access time
+• 70nS output enable access times
+• byte-wide output
+
+Wavetable ROM address
+A0
+A1
+A2
+A3
+A4
+A5
+A6
+A7
+A8
+A9
+A10
+A11
+A12
+A13
+A14
+A15
+A16
+A17
+A18
+A19
+A20
+A21
+A22
+A23
+
+The ICS2122-001, ICS2124-001 and ICS2124-002 comprise
+the ICS 2 MB and 4 MB patch sets respectively. Users of the
+WaveFront chipset can either buy ROMs directly from ICS or
+purchase the mask and produce the wavetable ROMs independently.
+Pin descriptions follow.
+
+DD<7:0>
+This bus is a bi-directional data bus for the wavetable data. It
+functions as an input under all operations except for DMA
+writes to DRAM. This bus connects directly to the data pins of
+all wavetable DRAM and ROM.
+
+MA<10:0>
+This output bus drives addresses to both DRAM and ROM
+wavetable memory.
+
+CAS<3:0>
+These outputs function as both CAS inputs to up to four banks
+of DRAM and as addresses to ROM. For a DRAM cycle, only
+one of these four outputs will toggle active (low) at a time. For
+a refresh cycle, they all toggle low to refresh all DRAM
+simultaneously.
+
+12
+
+ICS2115 Signal
+MA<0>
+MA<1>
+MA<2>
+MA<3>
+MA<4>
+MA<5>
+MA<6>
+MA<7>
+MA<8>
+RA<9>
+RA<10>
+RA<11>
+RA<12>
+RA<13>
+RA<14>
+RA<15>
+RA<16>
+RA<17>
+CAS<3>
+MA<9>
+MA<10>
+CAS<0>
+CAS<1>
+CAS<2>
+
+ICS2115
+6850 Mode Control (Emulation Base + 0) (Write Only)
+The host can access this MIDI control register by writing to this
+address. The control register is mapped as follows.
+
+BYTE
+BYTE functions as Low Byte OE for the low byte ROM of a
+16-bit ROM pair. When using the ICS2122-001, this connects
+to the output enable on the ROM. When using the 4 MB patch
+set, BYTE connects to the OE on the ICS2124-001.
+
+Reset (11-reset, else soft)
+Soft
+Transmit Interrupt Control
+Receive Interrupt Enable
+
+ROMEN
+ROMEN functions as High Byte OE for the high byte ROM of
+a 16-bit ROM pair. For systems using the ICS2122-001, this
+pin is unused. When using the 4 MB patch set, ROMEN
+connects to the OE on the ICS2124-002.
+
+MIDI (6850) Control Register
+
+1:0 - Reset - Resets the MIDI Port
+11 = Reset (Resets Receive Interrupt and Receive
+Interrupt Enable)
+00, 01 and 10 = No Reset
+4:2 - Soft - Software controlled functions
+6:5 - Transmit Buffer Empty Interrupt Control
+01 = Interrupts are enabled
+00, 10 and 11 = Interrupts disabled
+7: - Receive Buffer Full Interrupt Enable
+1 = Interrupts enabled
+0 = Interrupts disabled
+
+RAMREQ
+This input pin is used to request an external memory cycle. Its
+function is unused in the present design. RAMREQ should be
+tied high.
+
+RAMACK
+This output pin provides acknowledgment of an external memory cycle. It is unused in the current design.
+
+MPU-401/6850 Emulation Registers
+
+6850 Mode Status (Emulation Base + 0) (Read Only)
+The host can access this MIDI status register by reading this
+address. The status register is mapped as follows.
+
+These 4 registers will be mapped at an offset determined by the
+CSMM input. The WaveFront Synthesizer only decodes the
+least significant 2 address bits. For identification purposes, this
+document refers to these registers as Emulation Base + 0
+through Emulation Base + 3.
+
+Receive Buffer Full (RBF)
+Transmit Buffer Empty (TBE)
+Soft
+Interrupt Request (IRQ)
+
+MIDI Emulation Control/Status Register
+The MIDI Control Status register can be configured as
+either a 6850 compatible or an MPU-401 compatible
+UART. The WaveFront Operating System writes to the IndEmulMode Register to indicate the mode of emulation.
+
+MIDI (6850) Status Register
+
+0: - Receive Buffer Full
+1 = full
+0 = empty
+1: - Transmit Buffer Empty
+1 = empty
+0 = full
+6:2 - Soft
+7: - Interrupt Request
+1 = Interrupt pending
+0 = Interrupt not pending
+
+13
+
+ICS2115
+MPU-401 Mode Control (Emulation Base + 1) (Write Only)
+The host can access this MIDI control register by writing to this
+address. The control register mapping is software dependent.
+
+Soft
+
+MIDI (MPU-401) Control Register
+
+7:0 - Soft - Software controlled functions
+
+MPU-401 Mode Status (Emulation Base + 1) (Read Only)
+The host can access this MIDI status register by reading this
+address. The status register is mapped as follows.
+
+Synthesizer Registers
+In the ICS2115, the Synthesis and General Purpose registers
+are accessed indirectly via the Indirect I/O Registers. These 4
+registers will be mapped at an offset determined by the CS
+input. For identification, this document refers to these registers
+as Synthesizer Base + 0 through Synthesizer Base + 3.
+Synthesizer Base + 0 R
+IRQ/Status
+Synthesizer Base + 1 R/W Register Address
+Synthesizer Base + 2 R/W Data Low Byte/Word
+Synthesizer Base + 3 R/W Data High Byte/Byte
+
+Interrupt status (Synthesizer Base + 0) Read Only
+Timer Interrupt
+Oscillator Interrupt
+DMA Interrupt
+Emulation Interrupt
+Reserved
+Busy
+Interrupt
+
+Soft
+Transmit Buffer Full (TBF)
+Receive Buffer Empty (RBE)
+
+MIDI (MPU-401) Status Register
+
+5:0 - Soft
+6: - Transmit Buffer Full
+1 = full
+0 = empty
+7: - Receive Buffer Empty
+1 = empty
+0 = full
+
+Interrupt Status Register
+
+Note: Reading this Register does NOT clear any of the bits.
+0: - Timer Interrupt
+This indicates that one or both of the 2 internal
+WaveFront timers has expired.
+1: - Oscillator Interrupt
+When this interrupt occurs the WaveFront Operating
+Systems reads the Oscillator Interrupt Address register
+to determine the oscillator that needs servicing.
+2: - DMA Interrupt
+The DMA channel has completed a transfer.
+3: - Emulation Interrupt
+When this occurs it indicates that a read or write has
+occurred with one of the High Level Emulation Control or Data registers
+4: - Reserved
+5: - Reserved
+6: - Busy
+Status bit which indicates that the previous write operation to an internal register has not yet completed and
+thus a new write should not be initiated.
+7: - Interrupt
+This is the Operating System interrupt from the
+ICS2115.
+
+MIDI Emulation Data Register
+This register is the MIDI data port for writing and reading MIDI data. The host can transfer MIDI data between itself and the WaveFront Operating System via
+this register.
+
+6850 Mode Data (Emulation Base + 1) (Read/Write)
+Eight bit data.
+MPU-401 Mode Data (Emulation Base + 0) (Read/Write)
+Eight Bit data
+
+Registers Emulation Base + 2 and
+Emulation Base + 3
+These registers are reserved when the ICS2115 is in the
+host configuration
+
+14
+
+ICS2115
+Indirect Register Access
+There are two types of indirect registers in the chips; Synthesizer and General Purpose. Due to the timing restrictions on
+access to the internal indirect registers, access to the two types
+of registers are handled differently. In ICS2115, register addresses $00 through $3F are Synthesizer registers (for both read
+and write), and all others are for General Purpose use.
+General Purpose registers are immediately available for access.
+Synthesizer registers are internally buffered so that the chip
+hardware completes the data transfers at the required times.
+The WaveFront Operating System can read and write internal
+Synthesizer registers using 8 or 16 bit reads and writes. Access
+is accomplished via the 3 indirect registers:
+
+Indirect Address (Synthesizer Base + 1)
+This will contain the address of the internal Synthesizer
+register.
+Indirect Data Lo (Synthesizer Base + 2)
+Contains the Least significant 8 bits of the data to be
+written to or read from the internal Synthesizer register
+addressed by the Indirect Address register.
+Indirect Data Hi (Synthesizer Base + 3)
+Contains the Most significant 8 bits of the data to be
+written to or read from the internal Synthesizer register
+addressed by the Indirect Address register.
+
+15
+
+ICS2115
+Register Map
+The following list includes all the internal registers of the ICS2115 chip and their associated “indirect” addresses. All registers
+can be read and written unless otherwise indicated.
+Synthesizer Register Definitions
+Indirect
+Address
+00
+01
+02
+03
+04
+05
+06
+07
+08
+09
+0A
+0B
+0C
+0D
+0E
+0F
+10
+11
+12
+13-3F
+
+Rd/Wr
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+Rd
+R/W
+R/W
+R/W
+-
+
+Size
+8
+16
+16
+8
+16
+8
+8
+8
+8
+16
+16
+16
+8
+8
+8
+8
+8
+8
+8
+X
+
+Mnemonic
+OscConf
+OscFC
+OscStrtH
+OscStrtL
+OscEndH
+OscEndL
+VIncr
+VStart
+VEnd
+VolAcc
+OscAccH
+OscAccL
+OscPan
+VCtl
+ActiveOsc
+IRQV
+OscCtl
+OscSAddr
+VMode
+RESERVED
+
+Description
+Oscillator Configuration
+Wavesample Frequency (6 Integer, 9 Fraction)
+Wavesample Loop Start Address (16 Integer)
+Wavesample Loop Start Address (4 Integer, 4 Fraction)
+Wavesample Loop End Address (16 Integer)
+Wavesample Loop End Address (4 Integer, 4 Fraction)
+Volume Increment
+Volume Start Value
+Volume End Value
+Volume Accumulator
+Wavesample Address (16 Integer)
+Wavesample Address (4 Integer, 9 Fraction)
+Pan Value (Note - 10 Bits on 2210)
+Volume Envelope Control
+Active Voices
+Interrupt Source/Oscillator
+Oscillator Control
+Static Address Bits 27-20
+Reserved (Write 0)
+Do Not Access
+
+16
+
+ICS2115
+General Purpose Register Definitions
+Indirect
+Address
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+4A
+4B
+4C
+4D
+4E
+4F
+50
+51
+52
+53
+54
+55
+56
+57
+58-7F
+
+Rd/Wr
+Wr
+Wr
+Wr
+R/W
+Wr
+Wr
+Wr
+R/W
+Rd
+Rd
+R/W
+Rd
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+R/W
+-
+
+Size
+8
+8
+8
+8
+8
+8
+8
+8
+8
+16
+8
+8
+8
+8
+X
+8
+8
+8
+8
+8
+8
+8
+8
+8
+X
+
+Mnemonic
+Timer1
+Timer2
+Timer1PreS
+Timer2PreS_S
+DMAddrLo
+DMAddrMd
+DMAddrHi/Data
+DMACS
+AccMonS
+AccMonData
+DOCIntCS
+IntOscAddr
+MemCfg_Rev
+SysCtrl
+RESERVED
+OscNumber
+IndMIDIData
+IndMIDICS
+IndHostData
+IndHostCS
+IndMIDIIntC
+IndHostIntC
+IndIntStatus
+IndEmulMode
+RESERVED
+
+Description
+Timer Preset 1
+Timer Preset 2
+Prescaler 1
+Prescaler 2 (wr) and Timer Status (Rd)
+DMA Start Address Low [11:4]
+DMA Start Address Medium [19:12]
+DMA Start Address high [21:20]
+DMA Control/Status
+Accumulator Monitor Status
+Accumulator Monitor Data
+DOC Interrupt (Read) Int Enable (Write)
+Address of interrupting Oscillator
+Memory Config. (WR) & Chip Rev. # (Rd)
+System Control
+Do Not Access
+Oscillator Address being programmed
+MIDI Data Register
+MIDI Control/Status Register
+Host Data Register
+Host Control/Status Register
+MIDI Emulation interrupt Control
+Host Emulation Interrupt Control
+Host/MIDI Emulation Int. Status (Rd)
+Emulation Mode
+Do Not Access
+
+ICS2115
+
+LEAD
+COUNT
+20L
+28L
+44L
+52L
+68L
+84L
+
+FRAME
+THICKNESS
+TF
++/-.0003
+0.010
+0.010
+0.010
+0.010
+0.008
+0.008
+
+PKG.
+THICKNESS
+TP
++/-.004
+0.152
+0.152
+0.152
+0.152
+0.150
+0.150
+
+PKG. WIDTH
+TOP
+WT
++/-.004
+0.350
+0.450
+0.650
+0.750
+0.950
+1.160
+
+PKG. WIDTH
+BOTTOM
+WB
++/-.066
+0.323
+0.423
+0.623
+0.723
+0.923
+1.123
+
+Ordering Information
+ICS2115V
+Example:
+
+ICS XXXX M
+Package Type
+V=PLCC
+
+Device Type (consists of 3 or 4 digit numbers)
+Prefix
+ICS, AV=Standard Device; GSP=Genlock Device
+
+18
+
+OVERALL
+PKG. WIDTH
+WO
++/-.005
+0.390
+0.490
+0.690
+0.790
+0.990
+1.190
+
+CONTACT
+WIDTH
+WO
++.010/-.030
+0.320
+0.420
+0.620
+0.720
+0.920
+1.120
+
+ICS2115
+
+TQFP Package
+LEAD COUNT
+BODY THICKNESS
+FOOTPRINT (BODY+)
+DIMENSIONS
+TOLERANCE
+A
+A1
+
+MAX.
+
+A2
+D
+D1
+E
+E1
+L
+e
+b
+ccc
+ddd
+
+±0.5
+±0.25
+±0.10
+±0.25
+±0.10
+±0.15/-0.10
+BASIC
++0.05
+MAX.
+
+32L
+1.00
+
+1.40
+2.00
+
+1.20
+
+1.60
+0.05 MIN./0.10 MAX.
+
+1.00
+
+1.40
+9.00
+7.00
+9.00
+7.00
+0.60
+
+0.80
+0.35
+0.10
+0.20 MAX.
+
+Ordering Information
+ICS2115T
+Example:
+
+ICS XXXX M
+Package Type
+T=TQFP
+
+Device Type (consists of 3 or 4 digit numbers)
+Prefix
+ICS, AV=Standard Device; GSP=Genlock Device
+
+19
+
+0.50
+0.22
+0.08
+0.08 MAX.
+
+
