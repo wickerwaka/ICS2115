@@ -1,5 +1,37 @@
 # ICS2115 WaveFront Synthesizer — Hardware Reference Specification
 
+## Document Conventions
+
+This specification documents the ICS2115 WaveFront synthesizer chip's behavior by cross-referencing multiple primary sources. Each claim is attributed to its source using inline citations:
+
+- **(Datasheet: section p##)** — ICS2115 product datasheet (docs/ics2115.pdf / ics2115.txt)
+- **(MAME: function L##)** — MAME emulator source (mame/src/devices/sound/ics2115.cpp/h), with function name and approximate line number
+- **(GUS SDK: Section X.X)** — GUS UltraSound Low-Level Toolkit v2.22, which documents the register-compatible GF1 chip
+- **(GF1: gf1.v L##)** — Reverse-engineered GF1 verilog from die photographs (LPC-GUS/)
+- **(US Patent X,XXX,XXX)** — Related ICS/Analog Devices patents covering synthesis algorithms
+
+**Uncertainty markers** appear as blockquotes prefixed with `> **Uncertainty:**` when sources conflict or behavior is unclear. **Source Divergence** markers (`> **Source Divergence:**`) flag cases where MAME's implementation differs from other sources in potentially meaningful ways.
+
+**Register notation:** Bit ranges use `[high:low]` notation (e.g., `[7:4]` means bits 7 through 4 inclusive). Hexadecimal values are prefixed with `0x`. Signal names in `ALLCAPS` follow the datasheet convention; code identifiers use the MAME naming.
+
+---
+
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Fixed-Point Formats](#2-fixed-point-formats)
+3. [Lookup Tables](#3-lookup-tables)
+4. [Register Map & Access Protocol](#4-register-map--access-protocol)
+5. [Differences from GF1 (GUS)](#5-differences-from-gf1-gus)
+6. [Oscillator (Wavesample Engine)](#6-oscillator-wavesample-engine)
+7. [Volume Envelope (Ramp System)](#7-volume-envelope-ramp-system)
+8. [Mixing & Audio Output](#8-mixing--audio-output)
+9. [Timers](#9-timers)
+10. [Interrupt System](#10-interrupt-system)
+11. [Key-On / Key-Off Control](#11-key-on--key-off-control)
+
+---
+
 ## 1. Overview
 
 The ICS2115 is a wavetable synthesis chip manufactured by Integrated Circuit Systems (ICS). It produces 16-bit CD-quality audio by reading sample data from external ROM or DRAM, applying per-voice volume envelopes and panning, and outputting a stereo mix to an external DAC via a serial interface. (Datasheet: p1)
@@ -1067,3 +1099,373 @@ accum_clip = (positive_overflow) ? 0x7FFF :     // +32767
 | Accumulator | 21-bit with explicit clip at ±32768 | Stream-managed accumulation |
 | Ramp mechanism | Not visible in GF1 verilog | `state.ramp` 0x00–0x40 amplitude gate |
 | DAC output | Serial MSB-first via shift register | Serial MSB-first (see §1.4) |
+
+---
+
+## 9. Timers
+
+The ICS2115 contains two independent programmable timers that generate periodic interrupts. Each timer consists of an 8-bit preset register and an 8-bit prescaler register that together determine the timer period.
+
+### 9.1 Timer Registers
+
+| Register | Name | R/W | Description |
+|----------|------|-----|-------------|
+| 0x40 | Timer1 | Write | Timer 1 preset value (8-bit, 0–255) |
+| 0x41 | Timer2 | Write | Timer 2 preset value (8-bit, 0–255) |
+| 0x42 | Timer1PreS | Write | Timer 1 prescaler (8-bit) |
+| 0x43 | Timer2PreS_S | R/W | Timer 2 prescaler (write) / Timer status (read) |
+
+(Datasheet: General Purpose Register Definitions p17; MAME: `reg_write()` cases 0x40–0x43)
+
+**Reading timer preset registers** (0x40/0x41) returns the current preset value and has the side effect of clearing the corresponding timer's IRQ pending bit:
+
+```
+ret = timer[N].preset
+irq_pending &= ~(1 << N)     // clear timer N IRQ
+recalc_irq()
+```
+
+(MAME: `reg_read()` cases 0x40/0x41 L662-669)
+
+**Reading register 0x43** returns the timer status — the lower 2 bits of `irq_pending`, indicating which timers have fired:
+
+```
+[1]  Timer 2 IRQ pending
+[0]  Timer 1 IRQ pending
+```
+
+(MAME: `reg_read()` case 0x43 L673 — `m_irq_pending & 3`)
+
+### 9.2 Timer Period Formula
+
+The timer period is computed from the prescaler and preset values:
+
+```c
+period = ((scale & 0x1F) + 1) * (preset + 1);
+period = period << (4 + (scale >> 5));
+// Result is in master clock ticks
+```
+
+(MAME: `recalc_timer()` L1095-1096)
+
+Breaking down the prescaler byte:
+
+```
+scale register (8-bit):
+[7:5]  shift_amount — 3-bit binary shift selector (adds 4–11 positions)
+[4:0]  base_divider — 5-bit base multiplier (value 1–32)
+```
+
+The period in clock ticks is: `(base_divider + 1) × (preset + 1) × 2^(4 + shift_amount)`
+
+**Minimum period:** scale=0x00, preset=0x00 → `1 × 1 × 16 = 16` clock ticks
+**Maximum period:** scale=0xFF, preset=0xFF → `32 × 256 × 2^11 = 16,777,216` clock ticks
+
+With a 33.8688 MHz clock:
+- Minimum: 16 ticks = ~0.47 µs (~2.1 MHz)
+- Maximum: 16,777,216 ticks = ~495 ms (~2.0 Hz)
+
+### 9.3 Timer Callback and Auto-Reload
+
+When a timer fires, its callback sets the corresponding bit in `irq_pending` and triggers an IRQ recalculation — but only if that timer's IRQ bit is not already pending (edge-triggered, not level-triggered):
+
+```c
+timer_cb(timer_bit):
+    if NOT bit_set(irq_pending, timer_bit):
+        irq_pending |= (1 << timer_bit)
+        recalc_irq()
+```
+
+(MAME: `timer_cb()` L1083-1091)
+
+Timers are auto-reloading: once started via `recalc_timer()`, the MAME implementation uses `timer->adjust(period, timer_id, period)` which sets both the initial delay and the repeat interval to the same period. The timer continues firing at the programmed rate until the preset or prescaler is changed. (MAME: `recalc_timer()` L1101)
+
+The timer only re-adjusts if the computed period differs from the currently stored period, avoiding unnecessary timer resets when registers are written with the same value:
+
+```c
+if timer.period != new_period:
+    timer.period = new_period
+    timer.adjust(attotime::from_ticks(new_period, clock), timer_id, repeat=same)
+```
+
+(MAME: `recalc_timer()` L1098-1101)
+
+### 9.4 Timer Start/Stop
+
+Register 0x10 (OscCtl) contains timer start bits in addition to the oscillator control function:
+
+```
+OscCtl (0x10) byte, high byte on write:
+[7]    R (unknown function)
+[6]    M2 (unknown function)
+[5]    M1 (unknown function)
+[4:2]  unused
+[1]    Timer 2 start
+[0]    Timer 1 start
+```
+
+(Datasheet: Register Map p16; MAME: `reg_write()` case 0x10)
+
+> **Uncertainty:** The MAME source does not implement timer start/stop via OscCtl bits [1:0]. Timers begin running as soon as their preset or prescaler registers are written (via `recalc_timer()`). It is unclear whether the real hardware requires the OscCtl timer start bits to be set before the timers begin counting, or whether writing the preset/prescaler is sufficient. The GUS SDK describes timer control through a separate Timer Control register (GUS register 0x45 at 2X8), which has explicit enable/disable bits for each timer. (GUS SDK: Section 2.6.1.5 p14)
+
+### 9.5 GUS Timer Comparison
+
+The GUS/GF1 timers differ significantly in resolution and control:
+
+| Aspect | GF1 (GUS) | ICS2115 |
+|--------|-----------|---------|
+| Timer 1 resolution | Fixed 80 µs increments | Programmable via prescaler |
+| Timer 2 resolution | Fixed 320 µs increments | Programmable via prescaler |
+| Count range | 0–255 (count up to overflow) | Prescaler × preset formula |
+| Control | Dedicated timer control register (0x45) | Preset/prescaler writes auto-start |
+| IRQ clear | Read timer data register | Read preset register (0x40/0x41) |
+
+(GUS SDK: Section 2.6.1.5 p14)
+
+---
+
+## 10. Interrupt System
+
+The ICS2115 uses a single active-high, open-drain IRQ pin to signal the host processor. Multiple interrupt sources are multiplexed through a priority scheme and status register.
+
+### 10.1 IRQ Sources
+
+There are four categories of interrupt sources:
+
+| Source | Status Bit | Enable Mechanism | Description |
+|--------|-----------|------------------|-------------|
+| Timer | Bit 0 | Register 0x4A (DOCIntCS) write | Either timer has expired |
+| Oscillator | Bit 1 | Per-voice OscConf bit 5 | Any voice oscillator boundary cross |
+| DMA | Bit 2 | Register 0x4A | DMA transfer completed |
+| Emulation | Bit 3 | Register 0x4A | MIDI emulation register access |
+
+(Datasheet: Interrupt Status Register p14; MAME: `read()` case 0 L940-960)
+
+### 10.2 IRQ Signal Computation
+
+The IRQ output pin is the logical OR of all enabled pending interrupts — both system-level and per-voice:
+
+```c
+irq = (irq_pending & irq_enabled)          // system IRQs (timers, DMA, emulation)
+for each voice 0..31:
+    irq |= (voice.osc_conf.irq && voice.osc_conf.irq_pending)    // oscillator IRQs
+    irq |= (voice.vol_ctrl.irq && voice.vol_ctrl.irq_pending)    // volume ramp IRQs
+irq_pin = irq ? ASSERT : CLEAR
+```
+
+(MAME: `recalc_irq()` L1070-1081)
+
+The loop short-circuits when `irq` first becomes true — once any source is pending, the remaining voices need not be checked. The IRQ pin is driven high when active and returns to a resistive low state (via external 1K pull-down) when cleared. (Datasheet: IRQ pin description p8; MAME: `recalc_irq()` L1074 — `(!irq)` loop condition)
+
+### 10.3 IRQ Status Register (Base+0, Read)
+
+Reading the status register at I/O base+0 returns the current interrupt state without clearing any pending bits:
+
+```
+[7]  Interrupt — 1 if any IRQ source is active (master IRQ flag)
+[6]  Busy — previous synthesizer register write still pending
+[5]  Reserved
+[4]  Reserved
+[3]  Emulation Interrupt — MIDI emulation register activity
+[2]  DMA Interrupt — DMA transfer completed
+[1]  Oscillator Interrupt — any voice has osc IRQ pending
+[0]  Timer Interrupt — timer IRQ enabled AND timer IRQ pending
+```
+
+(Datasheet: Interrupt Status Register p14; MAME: `read()` case 0 L940-960)
+
+**Bit 7** reflects the computed IRQ state (`m_irq_on`). It is set only when at least one enabled interrupt source is pending.
+
+**Bit 1** (Oscillator Interrupt) is set if *any* active voice has `osc_conf.irq_pending` set. The MAME implementation scans voices 0 through `active_osc` and sets bit 1 on the first match.
+
+**Bit 0** (Timer Interrupt) is set only when `irq_enabled` is nonzero AND at least one timer IRQ bit is pending in `irq_pending`. This means the timer interrupt status depends on the global IRQ enable register, not just the timer's pending state. (MAME: `read()` L943 — `m_irq_enabled && (m_irq_pending & 3)`)
+
+> **Uncertainty:** The MAME implementation of the status register has `vol_ctrl.irq_pending` **commented out** from the oscillator interrupt scan (bit 1). The code reads: `if (//m_voice[i].vol_ctrl.bitflags.irq_pending || m_voice[i].osc_conf.bitflags.irq_pending)`. This means volume ramp IRQs do not contribute to the status register bit 1, even though they are checked in `recalc_irq()` for the actual IRQ pin. The datasheet describes bit 1 as "Oscillator Interrupt" specifically (not "Voice Interrupt"), which may explain this — volume ramp IRQs are a separate category. However, the datasheet does not describe a dedicated volume ramp interrupt status bit, so it is unclear how software is expected to detect pending volume ramp IRQs other than reading IRQV. (MAME: `read()` L947-948)
+
+### 10.4 IRQ Enable Register (0x4A)
+
+Register 0x4A has dual function — write sets enable bits, read returns pending bits:
+
+**Write (IRQ Enable):**
+```
+[7:0]  irq_enabled — bitmask enabling system interrupt sources
+       Bit 0: Timer 1 IRQ enable
+       Bit 1: Timer 2 IRQ enable
+       (Other bits: DMA, emulation — layout follows irq_pending)
+```
+
+Writing this register immediately triggers `recalc_irq()` to update the IRQ pin state. (MAME: `reg_write()` case 0x4A L900-905)
+
+**Read (IRQ Pending):**
+```
+[7:0]  irq_pending — bitmask of pending system interrupts
+```
+
+(MAME: `reg_read()` case 0x4A L680 — returns `m_irq_pending`)
+
+### 10.5 IRQV — Interrupt Vector Register (0x0F, Read)
+
+The IRQV register identifies which voice has a pending interrupt. It is the primary mechanism for interrupt service:
+
+```
+[7]    0 = oscillator IRQ pending on this voice (active low)
+[6]    0 = volume ramp IRQ pending on this voice (active low)
+[5]    1 (always set)
+[4:0]  voice number (0–31)
+```
+
+Returns `0xFF` if no voice has a pending interrupt. (MAME: `reg_read()` case 0x0F L623-660)
+
+**Read side effects (auto-clear):**
+
+1. Scan voices 0 through `active_osc` for the first with any IRQ pending
+2. Return voice index with `0xE0` OR'd in (bits [7:5] = `111`)
+3. Clear bit 7 if that voice has `osc_conf.irq_pending` (and clear the pending flag)
+4. Clear bit 6 if that voice has `vol_ctrl.irq_pending` (and clear the pending flag)
+5. Trigger `recalc_irq()` to update the IRQ pin
+
+The auto-clear behavior means each read of IRQV services one voice. The host must read IRQV in a loop until it returns `0xFF` to acknowledge all pending voice interrupts. This pattern is standard for GUS-compatible software. (MAME: `reg_read()` case 0x0F L623-660; GUS SDK: Section 2.6.1.2 p12)
+
+**Important:** Both oscillator and volume ramp IRQs for the same voice are cleared in a single IRQV read. The returned byte indicates *which type(s)* were pending via bits 7 and 6. A voice with both types pending will show both bits cleared to 0. (MAME: `reg_read()` case 0x0F — both `irq_pending` flags checked independently)
+
+### 10.6 IRQ Service Procedure
+
+A typical interrupt service routine follows this pattern:
+
+```
+1. Read status register (Base+0)
+2. Check bit 7 — if 0, no interrupt pending, return
+3. Check bit 0 — if set, timer IRQ:
+   a. Read register 0x43 to identify which timer(s) fired
+   b. Read register 0x40 or 0x41 to clear the specific timer IRQ
+   c. Process timer event
+4. Check bit 1 — if set, voice IRQ:
+   a. Read IRQV (register 0x0F)
+   b. If IRQV == 0xFF, all voice IRQs serviced, continue
+   c. Extract voice number from bits [4:0]
+   d. Check bit 7 (inverted): if 0, oscillator boundary crossed
+   e. Check bit 6 (inverted): if 0, volume ramp boundary crossed
+   f. Update voice parameters as needed (next envelope segment, loop change, etc.)
+   g. Repeat from (a) until IRQV returns 0xFF
+5. Check bits 2, 3 for DMA/emulation interrupts
+6. Return from interrupt
+```
+
+(MAME: source analysis; GUS SDK: Section 2.6.1 p11-12)
+
+### 10.7 IRQ Timing and Recalculation
+
+IRQ recalculation occurs at these points:
+- After any timer fires (`timer_cb`)
+- After reading IRQV (voice IRQ auto-clear)
+- After reading timer preset registers (timer IRQ clear)
+- After writing IRQ enable register (0x4A)
+- After writing OscConf (0x00) or VCtl (0x0D) — if IRQ enable/pending bits change
+- After `sound_stream_update()` processes all voices — if any boundary crossings generated IRQs
+- After writing reg 0x0F (IRQV) — if irq_pending bits are cleared
+
+The IRQ pin is level-sensitive: it stays asserted as long as any enabled source is pending, and de-asserts only when all pending sources have been acknowledged. (MAME: `recalc_irq()` called from multiple sites; Datasheet: "When the interrupt condition is cleared, the pin returns to a resistive low state")
+
+---
+
+## 11. Key-On / Key-Off Control
+
+Key-on and key-off are triggered by writing to register 0x10 (OscCtl). This register has overloaded semantics — the written value determines the action.
+
+### 11.1 Key-On (Write 0x00 to OscCtl)
+
+Writing `0x00` to register 0x10 (high byte) triggers the key-on sequence for the currently selected voice:
+
+```c
+keyon():
+    voice[osc_select].state.ramp = 0x40    // set amplitude gate to maximum (unity)
+    voice[osc_select].state.on = true      // mark voice as active
+```
+
+(MAME: `reg_write()` case 0x10 L847 — `if (!data) keyon()`; `keyon()` L1041-1065)
+
+**Pre-conditions:** Before issuing key-on, the host software must have already programmed:
+- OscConf (0x00): sample format, loop mode, direction, IRQ enable
+- OscFC (0x01): frequency counter for playback rate
+- OscStrtH/L (0x02/0x03): loop start address
+- OscEndH/L (0x04/0x05): loop end address
+- OscAccH/L (0x0A/0x0B): initial playback position
+- OscSAddr (0x11): ROM/DRAM bank select
+- VIncr (0x06), VStart (0x07), VEnd (0x08): volume envelope parameters
+- VolAcc (0x09): initial volume level
+- VCtl (0x0D): volume envelope control (direction, loop mode, IRQ)
+- OscPan (0x0C): pan position
+
+**Ramp initialization:** The `state.ramp = 0x40` sets the voice amplitude gate to unity immediately, bypassing the slow attack ramp (see §7.5). This means key-on produces immediate full-volume output — the volume envelope alone controls the attack shape.
+
+**State flag:** `state.on = !voice.osc.ctl` is set based on the written OscCtl value. Since key-on writes 0x00, `!0 = true`, marking the voice as on. (MAME: `reg_write()` case 0x10 L846)
+
+### 11.2 Key-Off (Write 0x0F to OscCtl)
+
+Writing `0x0F` to register 0x10 (high byte) triggers key-off for the currently selected voice:
+
+```c
+if data == 0x0F:
+    if NOT vmode:
+        voice.osc_conf.stop = true     // stop oscillator
+        voice.vol_ctrl.stop = true     // stop volume envelope
+    voice.state.on = false             // mark voice as inactive
+```
+
+(MAME: `reg_write()` case 0x10 L849-863)
+
+**Vmode dependency:** When `vmode = 0` (the default and documented operating mode), key-off sets both the oscillator and volume envelope stop bits, which halts sample playback and envelope progression. When `vmode != 0`, the stop bits are *not* set — the voice continues playing and the envelope continues running, but `state.on` is still cleared to false. The practical effect of `state.on = false` with vmode is that the slow-release voice ramp (§7.5) will begin decrementing, providing a gradual fade-out rather than an immediate stop.
+
+**Relationship to voice ramp:** After key-off, if the voice ramp (`state.ramp`) is still above zero, the `update_ramp()` function will decrement it by 1 each sample tick (since `state.on` is now false and the oscillator is stopped). This provides click-free note-off over approximately 64 sample ticks (about 1.9 ms at 33 kHz). (MAME: `update_ramp()` L413-429)
+
+### 11.3 Other OscCtl Values
+
+Any value written to OscCtl other than 0x00 or 0x0F is logged as unhandled by MAME. The register also stores the written value in `voice.osc.ctl`, which is readable back through register 0x10 read. (MAME: `reg_write()` case 0x10 L864-866; `reg_read()` case 0x10 — returns `voice.osc.ctl << 8`)
+
+### 11.4 Keyon/Keyoff and the Two Volume Mechanisms
+
+The ICS2115 has two independent volume control paths that interact during key-on and key-off:
+
+```
+                     ┌──────────────┐
+                     │ Volume       │
+     VIncr,VStart,   │ Envelope     │──→ vol.acc ──→ Volume Table ──→ linear amp
+     VEnd,VCtl       │ (§7)         │
+                     └──────────────┘
+                                              ×
+                     ┌──────────────┐         │
+     keyon/keyoff,   │ Voice Ramp   │──→ state.ramp ──→ multiply ──→ final amp
+     voice stop      │ (§7.5)       │    (0–64, >>6)
+                     └──────────────┘
+```
+
+**Key-on path:**
+1. Software sets up voice registers (osc, vol, pan)
+2. Software writes 0x00 to OscCtl → `keyon()` runs
+3. `state.ramp` = 0x40 (immediate full gate)
+4. `state.on` = true
+5. Voice begins playing: oscillator advances, volume envelope runs
+6. Output = sample × volume_table[vol.acc] × (state.ramp >> 6)
+
+**Key-off path:**
+1. Software writes 0x0F to OscCtl
+2. `osc_conf.stop` = true, `vol_ctrl.stop` = true (if vmode=0)
+3. `state.on` = false
+4. Voice ramp decrements each tick: `state.ramp -= 1`
+5. Over ~64 ticks, output fades to silence
+6. When `state.ramp` reaches 0, voice is effectively silent
+
+**Alternative key-off via volume envelope:** Instead of writing 0x0F to OscCtl, software can implement release by reprogramming the volume envelope to ramp down to zero, then stopping the voice when the envelope IRQ fires at the end of the release segment. This provides a shaped release curve rather than the linear ramp fade.
+
+### 11.5 GUS Key-On/Key-Off Comparison
+
+The GUS/GF1 keyon process differs slightly:
+
+| Aspect | GF1 (GUS) | ICS2115 |
+|--------|-----------|---------|
+| Key-on trigger | Clear stop bit in Voice Control (0x00) | Write 0x00 to OscCtl (0x10) |
+| Key-off trigger | Set stop bit in Voice Control (0x00) | Write 0x0F to OscCtl (0x10) |
+| Ramp at keyon | Not documented (no state.ramp equivalent) | state.ramp set to 0x40 (immediate unity) |
+| Click protection | Software responsibility | Hardware voice ramp provides slow release |
+
+(GUS SDK: Section 2.6.2.1 p16; MAME: `keyon()`, `reg_write()` case 0x10)
