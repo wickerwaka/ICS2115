@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:patents.google.com)",
+      "Bash(pdftotext:*)",
+      "Bash(brew install:*)",
+      "Bash(curl -L -o /Users/akawaka/Source/ICS2115/docs/US5809466A.pdf \"https://patentimages.storage.googleapis.com/0c/a1/44/18a3a6f5ab5161/US5809466.pdf\")",
+      "Bash(curl -L -o /Users/akawaka/Source/ICS2115/docs/US6246774B1.pdf \"https://patentimages.storage.googleapis.com/fe/87/40/c37f2e2e55d6b2/US6246774.pdf\")",
+      "Bash(curl -L -o /Users/akawaka/Source/ICS2115/docs/US6246774B1.pdf \"https://patentimages.storage.googleapis.com/3c/6d/8d/8e5a57e56c90ac/US6246774.pdf\")",
+      "Bash(curl -L -o /Users/akawaka/Source/ICS2115/docs/US6246774B1.pdf \"https://patentimages.storage.googleapis.com/89/03/58/c19b5af7a39f3f/US6246774.pdf\")",
+      "Bash(wc:*)",
+      "Bash(verilator --version)",
+      "Bash(grep -E \"\\(Makefile|CMakeLists|\\\\.sh$|build|\\\\.mk\\)\". Also, ../Arcade-IGSPGM_MiSTer/sim/ is a good source for an example verilator based system.)",
+      "Bash(find /Users/akawaka/Source/ICS2115 -maxdepth 2 -type f \\\\\\(-name Makefile* -o -name CMakeLists.txt -o -name *.mk -o -name *build* -o -name *.sh \\\\\\))",
+      "Bash(pkg-config --cflags verilator)",
+      "Read(//opt/homebrew/Cellar/verilator/5.018/share/verilator/include/**)",
+      "Bash(verilator --help)",
+      "Bash(make build:*)",
+      "Bash(./obj_dir/Vics2115 --help)",
+      "Bash(./obj_dir/Vics2115 -rom ../roms/pgm_m01s.rom -script test.script -wav test_output.wav -vcd /dev/null)",
+      "Bash(./obj_dir/Vics2115 -rom ../roms/pgm_m01s.rom -script debug.script -wav debug.wav -vcd debug.vcd 2>&1)",
+      "Bash(python3:*)"
+    ]
+  }
+}
