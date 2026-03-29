@@ -57,6 +57,18 @@ module ics2115
     logic [4:0] irqv_clear_voice;
 
     // =========================================================================
+    // Timer registers (two independent programmable timers)
+    // =========================================================================
+    logic [7:0]  timer_preset [0:1];   // 8-bit preset values
+    logic [7:0]  timer_scale  [0:1];   // 8-bit prescale values
+    logic [23:0] timer_count  [0:1];   // 24-bit down-counters
+    logic [23:0] timer_period [0:1];   // computed period values
+    logic        timer_running [0:1];  // whether timer is active
+
+    // Timer IRQ clear side-effect signals (like IRQV clear — registered)
+    logic        timer_irq_clear [0:1];
+
+    // =========================================================================
     // Tables instance
     // =========================================================================
     logic [11:0] vol_tbl_addr;
@@ -425,11 +437,12 @@ module ics2115
             endcase
         end else begin
             case (reg_select)
-                // 0x40/0x41: Timer presets — stub for T03
-                8'h40, 8'h41: reg_read_data = 16'd0;
+                // 0x40/0x41: Timer presets — read returns preset, side effect clears IRQ
+                8'h40: reg_read_data = {8'h00, timer_preset[0]};
+                8'h41: reg_read_data = {8'h00, timer_preset[1]};
 
-                // 0x43: Timer status — stub
-                8'h43: reg_read_data = 16'd0;
+                // 0x43: Timer status — returns pending bits 0-1
+                8'h43: reg_read_data = {8'h00, 6'd0, irq_pending[1:0]};
 
                 // 0x4A: IRQ enabled/pending — read returns irq_pending
                 8'h4A: reg_read_data = {8'h00, irq_pending};
@@ -488,6 +501,20 @@ module ics2115
         end
     end
 
+    // Timer IRQ auto-clear computation: detect reads of 0x40 or 0x41
+    // Reading timer preset clears the corresponding timer IRQ pending bit
+    logic timer_irq_clear_next [0:1];
+    always_comb begin
+        timer_irq_clear_next[0] = 1'b0;
+        timer_irq_clear_next[1] = 1'b0;
+        if (host_rd_pulse && host_addr == 2'd3) begin
+            if (reg_select == 8'h40)
+                timer_irq_clear_next[0] = 1'b1;
+            else if (reg_select == 8'h41)
+                timer_irq_clear_next[1] = 1'b1;
+        end
+    end
+
     always_comb begin
         case (host_addr)
             2'd0: begin
@@ -528,6 +555,15 @@ module ics2115
             irqv_clear_osc   <= 1'b0;
             irqv_clear_vol   <= 1'b0;
             irqv_clear_voice <= 5'd0;
+            timer_irq_clear[0] <= 1'b0;
+            timer_irq_clear[1] <= 1'b0;
+            for (int i = 0; i < 2; i++) begin
+                timer_preset[i]   <= 8'd0;
+                timer_scale[i]    <= 8'd0;
+                timer_count[i]    <= 24'd0;
+                timer_period[i]   <= 24'd0;
+                timer_running[i]  <= 1'b0;
+            end
             for (int i = 0; i < NUM_VOICES; i++) begin
                 voice_regs[i].osc_acc   <= 29'd0;
                 voice_regs[i].osc_fc    <= 16'd0;
@@ -620,6 +656,30 @@ module ics2115
                             endcase
                         end else begin
                             case (reg_select)
+                                8'h40: begin
+                                    timer_preset[0] <= host_din[7:0];
+                                    timer_period[0] <= (({19'd0, timer_scale[0][4:0]} + 24'd1) * ({16'd0, host_din[7:0]} + 24'd1)) << (4 + timer_scale[0][7:5]);
+                                    timer_count[0]  <= (({19'd0, timer_scale[0][4:0]} + 24'd1) * ({16'd0, host_din[7:0]} + 24'd1)) << (4 + timer_scale[0][7:5]);
+                                    timer_running[0] <= 1'b1;
+                                end
+                                8'h41: begin
+                                    timer_preset[1] <= host_din[7:0];
+                                    timer_period[1] <= (({19'd0, timer_scale[1][4:0]} + 24'd1) * ({16'd0, host_din[7:0]} + 24'd1)) << (4 + timer_scale[1][7:5]);
+                                    timer_count[1]  <= (({19'd0, timer_scale[1][4:0]} + 24'd1) * ({16'd0, host_din[7:0]} + 24'd1)) << (4 + timer_scale[1][7:5]);
+                                    timer_running[1] <= 1'b1;
+                                end
+                                8'h42: begin
+                                    timer_scale[0] <= host_din[7:0];
+                                    timer_period[0] <= (({19'd0, host_din[4:0]} + 24'd1) * ({16'd0, timer_preset[0]} + 24'd1)) << (4 + host_din[7:5]);
+                                    timer_count[0]  <= (({19'd0, host_din[4:0]} + 24'd1) * ({16'd0, timer_preset[0]} + 24'd1)) << (4 + host_din[7:5]);
+                                    timer_running[0] <= 1'b1;
+                                end
+                                8'h43: begin
+                                    timer_scale[1] <= host_din[7:0];
+                                    timer_period[1] <= (({19'd0, host_din[4:0]} + 24'd1) * ({16'd0, timer_preset[1]} + 24'd1)) << (4 + host_din[7:5]);
+                                    timer_count[1]  <= (({19'd0, host_din[4:0]} + 24'd1) * ({16'd0, timer_preset[1]} + 24'd1)) << (4 + host_din[7:5]);
+                                    timer_running[1] <= 1'b1;
+                                end
                                 8'h4A: irq_enabled <= host_din[7:0];
                                 8'h4F: osc_select <= host_din[4:0];
                                 default: ;
@@ -643,6 +703,31 @@ module ics2115
                         voice_regs[irqv_clear_voice].osc_conf[OSC_IRQ_PEND] <= 1'b0;
                     if (irqv_clear_vol)
                         voice_regs[irqv_clear_voice].vol_ctrl[VOL_IRQ_PEND] <= 1'b0;
+                end
+            end
+
+            // ── Timer IRQ auto-clear side-effect ──
+            // Register the clear request, apply one cycle later (same pattern as IRQV)
+            timer_irq_clear[0] <= timer_irq_clear_next[0];
+            timer_irq_clear[1] <= timer_irq_clear_next[1];
+
+            if (timer_irq_clear[0])
+                irq_pending[0] <= 1'b0;
+            if (timer_irq_clear[1])
+                irq_pending[1] <= 1'b0;
+
+            // ── Timer counter logic (gated by ce) ──
+            if (ce) begin
+                for (int t = 0; t < 2; t++) begin
+                    if (timer_running[t]) begin
+                        if (timer_count[t] == 24'd0) begin
+                            // Timer expired: set IRQ pending, reload
+                            irq_pending[t] <= 1'b1;
+                            timer_count[t] <= timer_period[t] - 24'd1;
+                        end else begin
+                            timer_count[t] <= timer_count[t] - 24'd1;
+                        end
+                    end
                 end
             end
         end
