@@ -289,9 +289,136 @@ module ics2115
             host_wr_prev <= host_cs_n | host_wr_n;
     end
 
-    // Stub outputs — full protocol is S05
+    // =========================================================================
+    // Host bus read detection
+    // =========================================================================
+    logic host_rd_pulse;
+    logic host_rd_prev;
+
+    assign host_rd_pulse = ~host_cs_n & ~host_rd_n & host_rd_prev;
+
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            host_rd_prev <= 1'b1;
+        else
+            host_rd_prev <= host_cs_n | host_rd_n;
+    end
+
+    // =========================================================================
+    // Register read mux — matches MAME reg_read() layout
+    // =========================================================================
+    logic [15:0] reg_read_data;
+
+    always_comb begin
+        reg_read_data = 16'd0;
+
+        if (reg_select < 8'h20) begin
+            case (reg_select[4:0])
+                // 0x00: Oscillator Configuration — osc_conf with state_on merged into bit 3
+                5'h00: begin
+                    reg_read_data = {voice_regs[osc_select].osc_conf | (voice_regs[osc_select].state_on ? 8'h08 : 8'h00), 8'h00};
+                end
+
+                // 0x01: Wavesample frequency (16-bit, no shift)
+                5'h01: reg_read_data = voice_regs[osc_select].osc_fc;
+
+                // 0x02: Wavesample loop start high (bits 28:13 of 29-bit addr)
+                5'h02: reg_read_data = voice_regs[osc_select].osc_start[28:13];
+
+                // 0x03: Wavesample loop start low (bits 12:5 in high byte)
+                5'h03: reg_read_data = {voice_regs[osc_select].osc_start[12:5], 8'h00};
+
+                // 0x04: Wavesample loop end high
+                5'h04: reg_read_data = voice_regs[osc_select].osc_end[28:13];
+
+                // 0x05: Wavesample loop end low
+                5'h05: reg_read_data = {voice_regs[osc_select].osc_end[12:5], 8'h00};
+
+                // 0x06: Volume Increment (8-bit)
+                5'h06: reg_read_data = {8'h00, voice_regs[osc_select].vol_incr};
+
+                // 0x07: Volume Start — top 8 bits of 26-bit value (bits 25:18)
+                5'h07: reg_read_data = {8'h00, voice_regs[osc_select].vol_start[25:18]};
+
+                // 0x08: Volume End — top 8 bits
+                5'h08: reg_read_data = {8'h00, voice_regs[osc_select].vol_end[25:18]};
+
+                // 0x09: Volume accumulator (bits 25:10 of 26-bit value)
+                5'h09: reg_read_data = voice_regs[osc_select].vol_acc[25:10];
+
+                // 0x0A: Wavesample address high (osc_acc bits 28:13)
+                5'h0A: reg_read_data = voice_regs[osc_select].osc_acc[28:13];
+
+                // 0x0B: Wavesample address low — MAME returns (acc >> 0) & 0xFFF8
+                // Our 29-bit acc maps: MAME bits [15:0] = our bits [15:0].
+                // Mask 0xFFF8 clears bits [2:0]. So return {osc_acc[15:3], 3'b000}.
+                5'h0B: reg_read_data = {voice_regs[osc_select].osc_acc[15:3], 3'b000};
+
+                // 0x0C: Pan — pan value in high byte
+                5'h0C: reg_read_data = {voice_regs[osc_select].vol_pan, 8'h00};
+
+                // 0x0D: Volume Envelope Control — stub for T02 IRQ work
+                5'h0D: begin
+                    if (vmode == 8'd0)
+                        reg_read_data = {(voice_regs[osc_select].vol_ctrl[VOL_IRQ_PEND] ? 8'h81 : 8'h01), 8'h00};
+                    else
+                        reg_read_data = {8'h01, 8'h00};
+                end
+
+                // 0x0E: Active Voices (5-bit)
+                5'h0E: reg_read_data = {11'h000, active_osc};
+
+                // 0x0F: IRQV — stub for T02
+                5'h0F: reg_read_data = 16'hFF00;
+
+                // 0x10: Oscillator Control — osc_ctl in high byte
+                5'h10: reg_read_data = {voice_regs[osc_select].osc_ctl, 8'h00};
+
+                // 0x11: Wavesample static address — saddr in high byte
+                5'h11: reg_read_data = {voice_regs[osc_select].osc_saddr, 8'h00};
+
+                default: reg_read_data = 16'd0;
+            endcase
+        end else begin
+            case (reg_select)
+                // 0x40/0x41: Timer presets — stub for T03
+                8'h40, 8'h41: reg_read_data = 16'd0;
+
+                // 0x43: Timer status — stub
+                8'h43: reg_read_data = 16'd0;
+
+                // 0x4A: IRQ pending — stub
+                8'h4A: reg_read_data = 16'd0;
+
+                // 0x4B: Address of Interrupting Oscillator — fixed 0x80
+                8'h4B: reg_read_data = {8'h80, 8'h00};
+
+                // 0x4C: Chip Revision
+                8'h4C: reg_read_data = {8'h00, CHIP_REVISION};
+
+                default: reg_read_data = 16'd0;
+            endcase
+        end
+    end
+
+    // =========================================================================
+    // Host bus read output mux — matches MAME read() at offsets 0-3
+    // =========================================================================
+    // Port 0: IRQ status (stub to 0x00 — T02 fills in)
+    // Port 1: reg_select echo
+    // Port 2: low byte of reg_read_data
+    // Port 3: high byte of reg_read_data
+    always_comb begin
+        case (host_addr)
+            2'd0: host_dout = {8'h00, 8'h00};                    // IRQ status stub
+            2'd1: host_dout = {8'h00, reg_select};                // reg_select echo
+            2'd2: host_dout = {8'h00, reg_read_data[7:0]};       // low byte
+            2'd3: host_dout = {reg_read_data[15:8], 8'h00};      // high byte in upper position
+            default: host_dout = 16'd0;
+        endcase
+    end
+
     assign host_ready = 1'b1;
-    assign host_dout  = 16'd0;
     assign host_irq   = 1'b0;
 
     // =========================================================================

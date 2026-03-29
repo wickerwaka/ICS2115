@@ -1,0 +1,30 @@
+# test_readback.script — write-read round-trip verification for register readback
+# Verifies: osc_fc, osc_start_h, vol_pan, active_osc, chip_revision
+
+# Select voice 0
+write 0x4F 0
+
+# --- osc_fc (reg 0x01): write 0x1234, expect read 0x1234 ---
+write 0x01 0x1234
+read 0x01
+
+# --- osc_start_h (reg 0x02): write 0x5678, expect read 0x5678 ---
+write 0x02 0x5678
+read 0x02
+
+# --- vol_pan (reg 0x0C): write 0x8000 (pan=0x80 in high byte), expect read 0x8000 ---
+write 0x0C 0x8000
+read 0x0C
+
+# --- active_osc (reg 0x0E): default is 31, expect read 0x001F ---
+read 0x0E
+
+# --- chip revision (reg 0x4C): expect 0x0001 ---
+read 0x4C
+
+# --- Negative test: read osc_conf (reg 0x00) without prior write ---
+# Default is 0x02 (stop=1), state_on=0 → (0x02 | 0x00) << 8 = 0x0200
+read 0x00
+
+# --- Negative test: read unimplemented register 0x1F → expect 0x0000 ---
+read 0x1F

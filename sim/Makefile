@@ -51,5 +51,8 @@ run-multi: build gen-multi-rom
 run-pan: build gen-multi-rom
 	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-vcd
 
+run-readback: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_readback.script -wav /dev/null -no-vcd
+
 clean:
 	rm -rf $(OBJ_DIR)

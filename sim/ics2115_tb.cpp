@@ -127,6 +127,42 @@ static void host_write_port(SimState& s, uint8_t port, uint16_t data) {
 }
 
 // ---------------------------------------------------------------------------
+// Host bus: read from a port
+// ---------------------------------------------------------------------------
+static uint16_t host_read_port(SimState& s, uint8_t port) {
+    auto* top = s.top;
+
+    // Assert CS + RD with address
+    top->host_addr  = port;
+    top->host_cs_n  = 0;
+    top->host_rd_n  = 0;
+    tick(s);
+
+    // Capture output while still asserted
+    uint16_t val = top->host_dout;
+
+    // Deassert
+    top->host_cs_n = 1;
+    top->host_rd_n = 1;
+    tick(s);
+
+    return val;
+}
+
+// ---------------------------------------------------------------------------
+// Register read: set reg address via port 1 write, then read high/low bytes
+// ---------------------------------------------------------------------------
+static uint16_t host_reg_read(SimState& s, uint8_t reg) {
+    // Port 1: set register address
+    host_write_port(s, 1, reg);
+    // Port 3: read high byte (returns value in high byte position)
+    uint16_t hi = host_read_port(s, 3);
+    // Port 2: read low byte (returns value in low byte position)
+    uint16_t lo = host_read_port(s, 2);
+    return (hi & 0xFF00) | (lo & 0x00FF);
+}
+
+// ---------------------------------------------------------------------------
 // Register write: set reg address, then write high and low bytes
 // ---------------------------------------------------------------------------
 static void host_reg_write(SimState& s, uint8_t reg, uint16_t value) {
@@ -317,10 +353,11 @@ static void execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
             host_reg_write(s, cmd.reg, cmd.value);
             break;
 
-        case CmdType::READ:
-            // Read not implemented in S02 stub — just log
-            printf("[%zu] read reg 0x%02X (stub — no readback in S02)\n", i, cmd.reg);
+        case CmdType::READ: {
+            uint16_t val = host_reg_read(s, cmd.reg);
+            printf("[%zu] read reg 0x%02X = 0x%04X\n", i, cmd.reg, val);
             break;
+        }
 
         case CmdType::WAIT: {
             printf("[%zu] wait %llu cycles\n", i, (unsigned long long)cmd.cycles);
@@ -346,10 +383,23 @@ static void execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
         }
 
         case CmdType::UNTIL: {
-            printf("[%zu] until reg 0x%02X & 0x%04X == 0x%04X (timeout %llu) — stub in S02\n",
+            printf("[%zu] until reg 0x%02X & 0x%04X == 0x%04X (timeout %llu)\n",
                    i, cmd.reg, cmd.mask, cmd.value, (unsigned long long)cmd.cycles);
-            // No register readback in S02 — just wait the timeout
-            printf("  WARNING: until not supported in S02 (no readback)\n");
+            bool matched = false;
+            uint16_t last_val = 0;
+            for (uint64_t c = 0; c < cmd.cycles; c++) {
+                last_val = host_reg_read(s, cmd.reg);
+                if ((last_val & cmd.mask) == cmd.value) {
+                    printf("  matched after %llu iterations: 0x%04X\n",
+                           (unsigned long long)(c + 1), last_val);
+                    matched = true;
+                    break;
+                }
+                // Tick a few cycles between polls to avoid spinning too tightly
+                for (int t = 0; t < 4; t++) tick(s);
+            }
+            if (!matched)
+                printf("  WARNING: until timed out, last value 0x%04X\n", last_val);
             break;
         }
         }
