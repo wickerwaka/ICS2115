@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-pwrite-test run-mame-log run-all clean
+.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-pwrite-test run-mame-log run-mame-analysis run-all clean
 
 all: build
 
@@ -93,6 +93,12 @@ run-mame-log: build
 	@if [ -z "$(ROM)" ]; then echo "Usage: make run-mame-log LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
 	python3 convert_mame_log.py $(LOG) -o mame_converted.script
 	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-vcd
+
+run-mame-analysis: build
+	@if [ -z "$(LOG)" ]; then echo "Usage: make run-mame-analysis LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
+	@if [ -z "$(ROM)" ]; then echo "Usage: make run-mame-analysis LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
+	python3 convert_mame_log.py $(LOG) -o mame_converted.script
+	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-vcd 2>/dev/null | python3 analyze_mame_divergence.py
 
 run-all: build gen-multi-rom
 	@echo "=== Running all tests ==="
