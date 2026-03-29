@@ -1,0 +1,71 @@
+# ICS2115 8-bit sample playback test
+# Programs voice 0 to play an 8-bit signed sine wave from ROM.
+# ROM layout: 8-bit sine at byte 0x1000 (1024 samples)
+#
+# osc_conf: LOOP (bit 3) + EIGHTBIT (bit 2) = 0x0C
+# Verifies: osc_conf readback, nonzero audio output
+
+# Select voice 0
+write 0x4F 0x0000
+
+# Set active_osc = 31
+write 0x0E 0x1F00
+
+# Frequency counter: fc=0x6000 (~387 Hz)
+write 0x01 0x6000
+
+# Oscillator accumulator = byte 0x1000 (start of 8-bit region)
+# acc = 0x1000 << 12 = 0x01000000
+# reg 0x0A: [28:21]=0x08, [20:13]=0x00 → 0x0800
+# reg 0x0B: [12:5]=0x00, [4:0]=0x00 → 0x0000
+write 0x0A 0x0800
+write 0x0B 0x0000
+
+# Sample bank = 0
+write 0x11 0x0000
+
+# Loop start = byte 0x1000
+# reg 0x02: 0x0800, reg 0x03: 0x0000
+write 0x02 0x0800
+write 0x03 0x0000
+
+# Loop end = byte 0x13FF (last 8-bit sample)
+# acc = 0x13FF << 12 = 0x013FF000
+# reg 0x04: [28:21]=0x09, [20:13]=0xFF → 0x09FF
+# reg 0x05: [12:5]=0x80, [4:0]=0x00 → 0x8000
+write 0x04 0x09FF
+write 0x05 0x8000
+
+# Volume max
+write 0x09 0xFFFF
+
+# Pan center
+write 0x0C 0x7F00
+
+# osc_conf: loop=1 (bit 3) + eightbit=1 (bit 2) = 0x0C
+write 0x00 0x0C00
+
+# vol_ctrl: done=1
+write 0x0D 0x0100
+
+# Keyon voice 0
+write 0x10 0x0000
+
+# Wait for playback
+wait 2000000
+
+# Verify osc_conf readback has eightbit and loop bits set
+# osc_conf is read from reg 0x00 in high byte, with state_on merged into bit 3
+# state_on=1, loop=1 → bit 3 shows state_on (1), eightbit=bit 2 (1)
+# osc_conf[6:0] = 0x0C, plus state_on in bit 3 readback.
+# Actually: the read merges state_on into bit 3: {osc_conf[7:4], state_on, osc_conf[2:0]}
+# osc_conf = 0x0C = 0b0000_1100, state_on=1
+# readback high byte = {0000, 1, 100} = 0b0000_1100 = 0x0C
+# But state_on replaces bit 3: {conf[7:4], state_on, conf[2:0]}
+# conf[7:4]=0x0, state_on=1, conf[2:0]=0b100
+# = 0b0000_1_100 = 0x0C — same value since loop bit=1 and state_on=1
+# Use mask 0x0400 to check eightbit bit (bit 2 in high byte = bit 10)
+expect 0x00 0x0C00 0x0C00
+
+# Let it play more for WAV output
+wait 38000000

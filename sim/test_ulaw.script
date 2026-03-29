@@ -1,0 +1,62 @@
+# ICS2115 µ-law sample playback test
+# Programs voice 0 to play a µ-law encoded sine wave from ROM.
+# ROM layout: µ-law sine at byte 0x1400 (1024 samples)
+#
+# osc_conf: LOOP (bit 3) + ULAW (bit 0) = 0x09
+# Verifies: osc_conf readback, nonzero audio output
+
+# Select voice 0
+write 0x4F 0x0000
+
+# Set active_osc = 31
+write 0x0E 0x1F00
+
+# Frequency counter: fc=0x6000 (~387 Hz)
+write 0x01 0x6000
+
+# Oscillator accumulator = byte 0x1400 (start of µ-law region)
+# acc = 0x1400 << 12 = 0x01400000
+# reg 0x0A: [28:21]=0x0A, [20:13]=0x00 → 0x0A00
+# reg 0x0B: [12:5]=0x00, [4:0]=0x00 → 0x0000
+write 0x0A 0x0A00
+write 0x0B 0x0000
+
+# Sample bank = 0
+write 0x11 0x0000
+
+# Loop start = byte 0x1400
+write 0x02 0x0A00
+write 0x03 0x0000
+
+# Loop end = byte 0x17FF (last µ-law sample)
+# acc = 0x17FF << 12 = 0x017FF000
+# reg 0x04: [28:21]=0x0B, [20:13]=0xFF → 0x0BFF
+# reg 0x05: [12:5]=0x80, [4:0]=0x00 → 0x8000
+write 0x04 0x0BFF
+write 0x05 0x8000
+
+# Volume max
+write 0x09 0xFFFF
+
+# Pan center
+write 0x0C 0x7F00
+
+# osc_conf: loop=1 (bit 3) + ulaw=1 (bit 0) = 0x09
+write 0x00 0x0900
+
+# vol_ctrl: done=1
+write 0x0D 0x0100
+
+# Keyon voice 0
+write 0x10 0x0000
+
+# Wait for playback
+wait 2000000
+
+# Verify osc_conf readback has ulaw and loop bits set
+# osc_conf = 0x09, state_on=1 → readback = 0x09 | 0x08 = 0x09 (bit 3 already set)
+# = 0x0900
+expect 0x00 0x0900 0x0900
+
+# Let it play more for WAV output
+wait 38000000

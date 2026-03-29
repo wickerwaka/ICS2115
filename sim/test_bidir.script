@@ -1,0 +1,64 @@
+# ICS2115 bidirectional oscillator loop test
+# Programs voice 0 with 16-bit sine and bidir+loop mode.
+# When accumulator hits loop end, direction inverts (OSC_INVERT toggles).
+#
+# osc_conf: BIDIR (bit 4) + LOOP (bit 3) = 0x18
+# Uses 16-bit sine from ROM byte 0x0000 (test.rom or multi_test.rom)
+
+# Select voice 0
+write 0x4F 0x0000
+
+# Set active_osc = 31
+write 0x0E 0x1F00
+
+# High frequency to hit boundary quickly
+# fc=0xFFFF → maximum step
+write 0x01 0xFFFF
+
+# Oscillator accumulator = byte 0x0000
+write 0x0A 0x0000
+write 0x0B 0x0000
+
+# Sample bank = 0
+write 0x11 0x0000
+
+# Loop start = byte 0x0000
+write 0x02 0x0000
+write 0x03 0x0000
+
+# Loop end = byte 0x07FE (last 16-bit sample in sine region)
+# acc = 0x07FE << 12 = 0x007FE000
+# reg 0x04: [28:21]=0x03, [20:13]=0xFF → 0x03FF
+# reg 0x05: [12:5]=0x00, [4:0]=0x00 → 0x0000
+write 0x04 0x03FF
+write 0x05 0x0000
+
+# Volume max
+write 0x09 0xFFFF
+
+# Pan center
+write 0x0C 0x7F00
+
+# osc_conf: bidir=1 (bit 4) + loop=1 (bit 3) = 0x18
+write 0x00 0x1800
+
+# vol_ctrl: done=1
+write 0x0D 0x0100
+
+# Keyon voice 0
+write 0x10 0x0000
+
+# Wait enough cycles for oscillator to traverse forward and hit boundary
+# At max freq, osc steps ~0x3FFFC per tick. With 2048 byte range,
+# boundary is reached in a few ticks. Wait a bit then check invert.
+wait 1000000
+
+# After boundary hit, OSC_INVERT (bit 6) should toggle to 1
+# osc_conf initial = 0x18, after bidir boundary → invert flips → 0x58
+# readback with state_on=1: 0x58 | 0x08 = 0x58 (bit 3 already set)
+# Check that invert bit (bit 6 = 0x40 in conf) is set
+# Mask 0x4000 checks just the invert bit in readback high byte
+expect 0x00 0x4000 0x4000
+
+# Let it play more — should bounce back and forth producing audio
+wait 39000000

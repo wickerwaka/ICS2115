@@ -1,0 +1,76 @@
+# ICS2115 volume envelope IRQ test
+# Programs voice 0 with a fast volume ramp toward vol_end.
+# When vol_acc reaches vol_end, VOL_IRQ_PEND fires → host_irq asserts.
+# IRQV read returns voice 0 with vol source: 0xA000.
+#
+# vol_ctrl: IRQ=1 (bit 5) = 0x20 — forward ramp, IRQ enabled, no loop
+# vol_incr: rate=0 (every tick), magnitude=63 (maximum) = 0x3F
+# vol_start=0, vol_end=0xFF (ramps from 0 to max)
+# vol_acc starts at 0
+
+# Select voice 0
+write 0x4F 0x0000
+
+# Set active_osc = 31
+write 0x0E 0x1F00
+
+# Frequency: moderate
+write 0x01 0x6000
+
+# Oscillator accumulator = 0 (start of ROM)
+write 0x0A 0x0000
+write 0x0B 0x0000
+
+# Sample bank = 0
+write 0x11 0x0000
+
+# Loop start = 0
+write 0x02 0x0000
+write 0x03 0x0000
+
+# Loop end = byte 2046
+write 0x04 0x03FF
+write 0x05 0x0000
+
+# osc_conf: loop=1 (bit 3) — keep oscillator running
+write 0x00 0x0800
+
+# Pan center
+write 0x0C 0x7F00
+
+# --- Volume envelope setup ---
+# vol_incr = 0x3F: rate[7:6]=0 (every tick), magnitude[5:0]=63 (fast)
+write 0x06 0x3F00
+
+# vol_start = 0 (silence)
+write 0x07 0x0000
+
+# vol_end = 0xFF (max volume)
+write 0x08 0x00FF
+
+# vol_acc = 0 (start at silence)
+write 0x09 0x0000
+
+# vol_ctrl: IRQ=1 (bit 5) = 0x20 — forward ramp, no loop, IRQ on boundary
+write 0x0D 0x2000
+
+# Keyon voice 0
+write 0x10 0x0000
+
+# Wait for volume IRQ — vol ramp should reach vol_end quickly
+# vol_add = 63 << 9 = 0x7E00 per tick. vol_end = 0xFF << 18 = 0x03FC0000
+# Ticks to boundary: 0x03FC0000 / 0x7E00 ≈ 8128 sample ticks
+# At 32 voices, ~260k clock cycles. Give plenty of margin.
+wait_irq 10000000
+
+# Read IRQV — should show voice 0 with vol source
+# IRQV format: {3'b111, voice_idx[4:0]} = 0xE0 for voice 0
+# Vol pending clears bit 6 (bit 14) → 0xE0 & ~0x40 = 0xA0
+# Full reg: 0xA000
+expect 0x0F 0xA000
+
+# Wait for auto-clear
+wait 100
+
+# Second IRQV read — should show no pending: 0xFF00
+expect 0x0F 0xFF00

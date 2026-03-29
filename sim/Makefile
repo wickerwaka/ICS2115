@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-all clean
+.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-all clean
 
 all: build
 
@@ -71,10 +71,24 @@ run-timer: build
 run-s05-integration: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_s05_integration.script -wav /dev/null -no-vcd
 
+run-8bit: build gen-multi-rom
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_8bit.script -wav 8bit_output.wav -no-vcd
+	python3 analyze_wav.py 8bit_output.wav --min-peak 1
+
+run-ulaw: build gen-multi-rom
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_ulaw.script -wav ulaw_output.wav -no-vcd
+	python3 analyze_wav.py ulaw_output.wav --min-peak 1
+
+run-bidir: build gen-multi-rom
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_bidir.script -wav bidir_output.wav -no-vcd
+
+run-vol-irq: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_irq.script -wav vol_irq_output.wav -no-vcd
+
 run-all: build gen-multi-rom
 	@echo "=== Running all tests ==="
 	@passed=0; failed=0; total=0; \
-	for target in run run-vol-env run-vol-loop run-multi-check run-pan-check run-readback run-irq run-timer run-s05-integration; do \
+	for target in run run-vol-env run-vol-loop run-multi-check run-pan-check run-readback run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq; do \
 	  total=$$((total + 1)); \
 	  echo "--- $$target ---"; \
 	  if $(MAKE) --no-print-directory $$target; then \
