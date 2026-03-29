@@ -1,0 +1,16 @@
+# Port-level command test
+# Exercises pwrite/pread/pexpect at the raw host port level
+
+# Chip-detect probe: write 0x5A to port 1, read back, write 0xA5, read back
+pwrite 0x01 0x5A
+pexpect 0x01 0x5A
+pwrite 0x01 0xA5
+pexpect 0x01 0xA5
+
+# Verify port 0 read (status register) doesn't crash
+pread 0x00
+
+# Verify port 2 and port 3 reads work
+pwrite 0x01 0x00
+pread 0x02
+pread 0x03

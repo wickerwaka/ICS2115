@@ -23,7 +23,7 @@ static constexpr int      RESET_CYCLES     = 200;
 // ---------------------------------------------------------------------------
 // Script command types
 // ---------------------------------------------------------------------------
-enum class CmdType { WRITE, READ, WAIT, WAIT_IRQ, UNTIL, EXPECT };
+enum class CmdType { WRITE, READ, WAIT, WAIT_IRQ, UNTIL, EXPECT, PWRITE, PREAD, PEXPECT };
 
 struct ScriptCmd {
     CmdType  type;
@@ -293,6 +293,32 @@ static std::vector<ScriptCmd> parse_script(const char* filename) {
                 sc.mask = std::stoul(mask_s, nullptr, 0);
             else
                 sc.mask = 0xFFFF;
+        } else if (cmd == "pwrite") {
+            sc.type = CmdType::PWRITE;
+            std::string port_s, val_s;
+            if (!(iss >> port_s >> val_s)) {
+                fprintf(stderr, "ERROR: line %d: pwrite requires <port> <value>\n", line_num);
+                exit(1);
+            }
+            sc.reg   = std::stoul(port_s, nullptr, 0);
+            sc.value = std::stoul(val_s, nullptr, 0);
+        } else if (cmd == "pread") {
+            sc.type = CmdType::PREAD;
+            std::string port_s;
+            if (!(iss >> port_s)) {
+                fprintf(stderr, "ERROR: line %d: pread requires <port>\n", line_num);
+                exit(1);
+            }
+            sc.reg = std::stoul(port_s, nullptr, 0);
+        } else if (cmd == "pexpect") {
+            sc.type = CmdType::PEXPECT;
+            std::string port_s, val_s;
+            if (!(iss >> port_s >> val_s)) {
+                fprintf(stderr, "ERROR: line %d: pexpect requires <port> <value>\n", line_num);
+                exit(1);
+            }
+            sc.reg   = std::stoul(port_s, nullptr, 0);
+            sc.value = std::stoul(val_s, nullptr, 0);
         } else {
             fprintf(stderr, "ERROR: line %d: unknown command '%s'\n", line_num, cmd.c_str());
             exit(1);
@@ -431,6 +457,36 @@ static int execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
             } else {
                 printf("[%zu] EXPECT reg 0x%02X: expected 0x%04X got 0x%04X (mask 0x%04X) — FAIL\n",
                        i, cmd.reg, cmd.value, masked, cmd.mask);
+                error_count++;
+            }
+            break;
+        }
+
+        case CmdType::PWRITE:
+            printf("[%zu] pwrite port 0x%02X = 0x%02X\n", i, cmd.reg, cmd.value);
+            host_write_port(s, cmd.reg, cmd.value);
+            break;
+
+        case CmdType::PREAD: {
+            uint16_t val = host_read_port(s, cmd.reg);
+            printf("[%zu] pread port 0x%02X = 0x%04X\n", i, cmd.reg, val);
+            break;
+        }
+
+        case CmdType::PEXPECT: {
+            uint16_t raw = host_read_port(s, cmd.reg);
+            uint8_t actual;
+            if (cmd.reg == 3)
+                actual = (raw >> 8) & 0xFF;
+            else
+                actual = raw & 0xFF;
+            uint8_t expected = cmd.value & 0xFF;
+            if (actual == expected) {
+                printf("[%zu] PEXPECT port 0x%02X: expected 0x%02X got 0x%02X (raw 0x%04X) — PASS\n",
+                       i, cmd.reg, expected, actual, raw);
+            } else {
+                printf("[%zu] PEXPECT port 0x%02X: expected 0x%02X got 0x%02X (raw 0x%04X) — FAIL\n",
+                       i, cmd.reg, expected, actual, raw);
                 error_count++;
             }
             break;

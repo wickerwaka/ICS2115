@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-all clean
+.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-pwrite-test run-mame-log run-all clean
 
 all: build
 
@@ -85,10 +85,19 @@ run-bidir: build gen-multi-rom
 run-vol-irq: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_irq.script -wav vol_irq_output.wav -no-vcd
 
+run-pwrite-test: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_port.script -wav /dev/null -no-vcd
+
+run-mame-log: build
+	@if [ -z "$(LOG)" ]; then echo "Usage: make run-mame-log LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
+	@if [ -z "$(ROM)" ]; then echo "Usage: make run-mame-log LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
+	python3 mame_log_to_script.py $(LOG) mame_converted.script
+	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-vcd
+
 run-all: build gen-multi-rom
 	@echo "=== Running all tests ==="
 	@passed=0; failed=0; total=0; \
-	for target in run run-vol-env run-vol-loop run-multi-check run-pan-check run-readback run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq; do \
+	for target in run run-vol-env run-vol-loop run-multi-check run-pan-check run-readback run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-pwrite-test; do \
 	  total=$$((total + 1)); \
 	  echo "--- $$target ---"; \
 	  if $(MAKE) --no-print-directory $$target; then \
