@@ -1,0 +1,95 @@
+# ICS2115 Pan Stereo Isolation Test
+# Programs 2 voices with hard pan positions to verify stereo separation.
+# Voice 0: sine wave, pan=0x00 (hard left)
+# Voice 1: square wave, pan=0xFF (hard right)
+# Both at maximum volume, vol_ctrl.done=1
+#
+# Pan=0x00: left_atten = panlaw[255] = 9 (minimal), right_atten = panlaw[0] = 0xFFF → mostly left
+# Pan=0xFF: left_atten = panlaw[0] = 0xFFF, right_atten = panlaw[255] = 9 → mostly right
+#
+# ROM: multi_test.rom (4096 bytes)
+#   0x0000-0x07FF: 1024-sample sine wave
+#   0x0800-0x0FFF: 1024-sample square wave
+
+# ---- Voice 0: Sine wave, hard left ----
+# Select voice 0
+write 0x4F 0x0000
+
+# Set active_osc = 31 (all 32 voices)
+write 0x0E 0x1F00
+
+# Frequency counter: fc=0x6000 → ~387 Hz
+write 0x01 0x6000
+
+# Oscillator accumulator = 0 (start of ROM)
+write 0x0A 0x0000
+write 0x0B 0x0000
+
+# Sample bank = 0
+write 0x11 0x0000
+
+# Loop start = 0
+write 0x02 0x0000
+write 0x03 0x0000
+
+# Loop end = byte addr 2046
+# 20.9: 2046 << 9 = 0x000FFC00
+write 0x04 0x007F
+write 0x05 0xE000
+
+# Volume max
+write 0x09 0xFFFF
+
+# Pan = 0x00 (hard left)
+write 0x0C 0x0000
+
+# osc_conf: loop=1 (bit 3)
+write 0x00 0x0800
+
+# vol_ctrl: done=1 (bit 0)
+write 0x0D 0x0100
+
+# Keyon voice 0
+write 0x10 0x0000
+
+# ---- Voice 1: Square wave, hard right ----
+# Select voice 1
+write 0x4F 0x0001
+
+# Frequency counter: fc=0x4000 → ~258 Hz
+write 0x01 0x4000
+
+# Oscillator accumulator = byte addr 2048 (0x800)
+# 20.9: 2048 << 9 = 0x00100000
+write 0x0A 0x0080
+write 0x0B 0x0000
+
+# Sample bank = 0
+write 0x11 0x0000
+
+# Loop start = byte addr 2048
+write 0x02 0x0080
+write 0x03 0x0000
+
+# Loop end = byte addr 4094
+# 20.9: 4094 << 9 = 0x001FFC00
+write 0x04 0x00FF
+write 0x05 0xE000
+
+# Volume max
+write 0x09 0xFFFF
+
+# Pan = 0xFF (hard right)
+write 0x0C 0xFF00
+
+# osc_conf: loop=1 (bit 3)
+write 0x00 0x0800
+
+# vol_ctrl: done=1 (bit 0)
+write 0x0D 0x0100
+
+# Keyon voice 1
+write 0x10 0x0000
+
+# Wait 80M cycles (~50k+ audio frames)
+wait 80000000

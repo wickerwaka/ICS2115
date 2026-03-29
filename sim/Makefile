@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run run-vcd run-vol-env run-vol-loop clean
+.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan clean
 
 all: build
 
@@ -41,6 +41,15 @@ run-vol-env: build
 
 run-vol-loop: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_loop.script -wav vol_loop_output.wav -no-vcd
+
+gen-multi-rom:
+	python3 gen_multi_rom.py
+
+run-multi: build gen-multi-rom
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_multi.script -wav multi_output.wav -no-vcd
+
+run-pan: build gen-multi-rom
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-vcd
 
 clean:
 	rm -rf $(OBJ_DIR)
