@@ -23,7 +23,7 @@ static constexpr int      RESET_CYCLES     = 200;
 // ---------------------------------------------------------------------------
 // Script command types
 // ---------------------------------------------------------------------------
-enum class CmdType { WRITE, READ, WAIT, WAIT_IRQ, UNTIL };
+enum class CmdType { WRITE, READ, WAIT, WAIT_IRQ, UNTIL, EXPECT };
 
 struct ScriptCmd {
     CmdType  type;
@@ -280,6 +280,19 @@ static std::vector<ScriptCmd> parse_script(const char* filename) {
                 sc.cycles = std::stoull(timeout_s, nullptr, 0);
             else
                 sc.cycles = DEFAULT_TIMEOUT;
+        } else if (cmd == "expect") {
+            sc.type = CmdType::EXPECT;
+            std::string reg_s, val_s, mask_s;
+            if (!(iss >> reg_s >> val_s)) {
+                fprintf(stderr, "ERROR: line %d: expect requires <reg> <value> [mask]\n", line_num);
+                exit(1);
+            }
+            sc.reg   = std::stoul(reg_s, nullptr, 0);
+            sc.value = std::stoul(val_s, nullptr, 0);
+            if (iss >> mask_s)
+                sc.mask = std::stoul(mask_s, nullptr, 0);
+            else
+                sc.mask = 0xFFFF;
         } else {
             fprintf(stderr, "ERROR: line %d: unknown command '%s'\n", line_num, cmd.c_str());
             exit(1);
@@ -343,7 +356,9 @@ static void write_wav(const char* filename,
 // ---------------------------------------------------------------------------
 // Script executor
 // ---------------------------------------------------------------------------
-static void execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
+static int execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
+    int error_count = 0;
+
     for (size_t i = 0; i < cmds.size(); i++) {
         const auto& cmd = cmds[i];
 
@@ -377,8 +392,10 @@ static void execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
                     break;
                 }
             }
-            if (!got_irq)
-                printf("  WARNING: wait_irq timed out\n");
+            if (!got_irq) {
+                printf("  FAIL: wait_irq timed out\n");
+                error_count++;
+            }
             break;
         }
 
@@ -398,12 +415,33 @@ static void execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
                 // Tick a few cycles between polls to avoid spinning too tightly
                 for (int t = 0; t < 4; t++) tick(s);
             }
-            if (!matched)
-                printf("  WARNING: until timed out, last value 0x%04X\n", last_val);
+            if (!matched) {
+                printf("  FAIL: until timed out, last value 0x%04X\n", last_val);
+                error_count++;
+            }
+            break;
+        }
+
+        case CmdType::EXPECT: {
+            uint16_t actual = host_reg_read(s, cmd.reg);
+            uint16_t masked = actual & cmd.mask;
+            if (masked == cmd.value) {
+                printf("[%zu] EXPECT reg 0x%02X: expected 0x%04X got 0x%04X (mask 0x%04X) — PASS\n",
+                       i, cmd.reg, cmd.value, masked, cmd.mask);
+            } else {
+                printf("[%zu] EXPECT reg 0x%02X: expected 0x%04X got 0x%04X (mask 0x%04X) — FAIL\n",
+                       i, cmd.reg, cmd.value, masked, cmd.mask);
+                error_count++;
+            }
             break;
         }
         }
     }
+
+    if (error_count > 0)
+        printf("ERRORS: %d assertion(s) failed\n", error_count);
+
+    return error_count;
 }
 
 // ---------------------------------------------------------------------------
@@ -504,7 +542,7 @@ int main(int argc, char** argv) {
 
     // Execute script
     printf("Executing script...\n");
-    execute_script(s, cmds);
+    int errors = execute_script(s, cmds);
 
     // Write WAV output
     write_wav(wav_file, s.audio_samples, sample_rate);
@@ -520,5 +558,5 @@ int main(int argc, char** argv) {
     if (enable_vcd)
         printf("VCD: %s\n", vcd_file);
 
-    return 0;
+    return errors < 255 ? errors : 255;
 }
