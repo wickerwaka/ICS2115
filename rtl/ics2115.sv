@@ -45,6 +45,18 @@ module ics2115
     logic [7:0] vmode;
 
     // =========================================================================
+    // IRQ system registers
+    // =========================================================================
+    logic [7:0] irq_pending;    // system IRQ pending bitmap (bits 0-1 = timers)
+    logic [7:0] irq_enabled;    // system IRQ enable mask (register 0x4A write)
+    logic       irq_on;         // computed IRQ state
+
+    // IRQV auto-clear side-effect signals (registered — cleared one cycle after host read)
+    logic       irqv_clear_osc;
+    logic       irqv_clear_vol;
+    logic [4:0] irqv_clear_voice;
+
+    // =========================================================================
     // Tables instance
     // =========================================================================
     logic [11:0] vol_tbl_addr;
@@ -305,9 +317,25 @@ module ics2115
     end
 
     // =========================================================================
+    // recalc_irq — combinational IRQ state computation
+    // Matches MAME recalc_irq(): scans all 32 voices for pending IRQs
+    // =========================================================================
+    always_comb begin
+        irq_on = |(irq_pending & irq_enabled);
+        for (int i = 0; i < NUM_VOICES; i++) begin
+            irq_on = irq_on |
+                (voice_regs[i].osc_conf[OSC_IRQ] & voice_regs[i].osc_conf[OSC_IRQ_PEND]) |
+                (voice_regs[i].vol_ctrl[VOL_IRQ] & voice_regs[i].vol_ctrl[VOL_IRQ_PEND]);
+        end
+    end
+
+    assign host_irq = irq_on;
+
+    // =========================================================================
     // Register read mux — matches MAME reg_read() layout
     // =========================================================================
     logic [15:0] reg_read_data;
+    logic        irqv_found;  // used in IRQV scan to find first match
 
     always_comb begin
         reg_read_data = 16'd0;
@@ -368,8 +396,24 @@ module ics2115
                 // 0x0E: Active Voices (5-bit)
                 5'h0E: reg_read_data = {11'h000, active_osc};
 
-                // 0x0F: IRQV — stub for T02
-                5'h0F: reg_read_data = 16'hFF00;
+                // 0x0F: IRQV — scan voices for first pending IRQ
+                // Returns voice_idx | 0xE0, bit 7 cleared if osc pending, bit 6 cleared if vol pending
+                5'h0F: begin
+                    reg_read_data = 16'hFF00;  // default: no pending
+                    irqv_found = 1'b0;
+                    for (int i = 0; i < NUM_VOICES; i++) begin
+                        if (i[4:0] <= active_osc && !irqv_found) begin
+                            if (voice_regs[i].osc_conf[OSC_IRQ_PEND] || voice_regs[i].vol_ctrl[VOL_IRQ_PEND]) begin
+                                irqv_found = 1'b1;
+                                reg_read_data[15:8] = {3'b111, i[4:0]};
+                                if (voice_regs[i].osc_conf[OSC_IRQ_PEND])
+                                    reg_read_data[15] = 1'b0;  // clear bit 7 = osc source
+                                if (voice_regs[i].vol_ctrl[VOL_IRQ_PEND])
+                                    reg_read_data[14] = 1'b0;  // clear bit 6 = vol source
+                            end
+                        end
+                    end
+                end
 
                 // 0x10: Oscillator Control — osc_ctl in high byte
                 5'h10: reg_read_data = {voice_regs[osc_select].osc_ctl, 8'h00};
@@ -387,8 +431,8 @@ module ics2115
                 // 0x43: Timer status — stub
                 8'h43: reg_read_data = 16'd0;
 
-                // 0x4A: IRQ pending — stub
-                8'h4A: reg_read_data = 16'd0;
+                // 0x4A: IRQ enabled/pending — read returns irq_pending
+                8'h4A: reg_read_data = {8'h00, irq_pending};
 
                 // 0x4B: Address of Interrupting Oscillator — fixed 0x80
                 8'h4B: reg_read_data = {8'h80, 8'h00};
@@ -404,13 +448,59 @@ module ics2115
     // =========================================================================
     // Host bus read output mux — matches MAME read() at offsets 0-3
     // =========================================================================
-    // Port 0: IRQ status (stub to 0x00 — T02 fills in)
+    // Port 0: IRQ status register
     // Port 1: reg_select echo
     // Port 2: low byte of reg_read_data
     // Port 3: high byte of reg_read_data
+
+    // Port 0 status register: compute "any voice has osc IRQ pending"
+    logic any_voice_osc_irq;
+    always_comb begin
+        any_voice_osc_irq = 1'b0;
+        for (int i = 0; i < NUM_VOICES; i++) begin
+            if (i[4:0] <= active_osc)
+                any_voice_osc_irq = any_voice_osc_irq | voice_regs[i].osc_conf[OSC_IRQ_PEND];
+        end
+    end
+
+    // IRQV auto-clear computation: combinational scan for which voice to clear
+    // Used by the registered irqv_clear_* signals below
+    logic       irqv_clear_osc_next;
+    logic       irqv_clear_vol_next;
+    logic [4:0] irqv_clear_voice_next;
+    logic       irqv_clear_found;
+    always_comb begin
+        irqv_clear_osc_next   = 1'b0;
+        irqv_clear_vol_next   = 1'b0;
+        irqv_clear_voice_next = 5'd0;
+        irqv_clear_found      = 1'b0;
+        if (host_rd_pulse && host_addr == 2'd3 && reg_select == 8'h0F) begin
+            for (int i = 0; i < NUM_VOICES; i++) begin
+                if (i[4:0] <= active_osc && !irqv_clear_found) begin
+                    if (voice_regs[i].osc_conf[OSC_IRQ_PEND] || voice_regs[i].vol_ctrl[VOL_IRQ_PEND]) begin
+                        irqv_clear_found      = 1'b1;
+                        irqv_clear_voice_next = i[4:0];
+                        irqv_clear_osc_next   = voice_regs[i].osc_conf[OSC_IRQ_PEND];
+                        irqv_clear_vol_next   = voice_regs[i].vol_ctrl[VOL_IRQ_PEND];
+                    end
+                end
+            end
+        end
+    end
+
     always_comb begin
         case (host_addr)
-            2'd0: host_dout = {8'h00, 8'h00};                    // IRQ status stub
+            2'd0: begin
+                // Port 0: IRQ status — MAME read() case 0
+                host_dout = 16'd0;
+                if (irq_on) begin
+                    host_dout[7] = 1'b1;  // bit 7: any IRQ active
+                    if (irq_enabled != 8'd0 && (irq_pending & 8'h03) != 8'h00)
+                        host_dout[0] = 1'b1;  // bit 0: timer IRQ pending & enabled
+                    if (any_voice_osc_irq)
+                        host_dout[1] = 1'b1;  // bit 1: voice osc IRQ pending
+                end
+            end
             2'd1: host_dout = {8'h00, reg_select};                // reg_select echo
             2'd2: host_dout = {8'h00, reg_read_data[7:0]};       // low byte
             2'd3: host_dout = {reg_read_data[15:8], 8'h00};      // high byte in upper position
@@ -419,7 +509,7 @@ module ics2115
     end
 
     assign host_ready = 1'b1;
-    assign host_irq   = 1'b0;
+    // host_irq driven by recalc_irq logic above
 
     // =========================================================================
     // Unified voice_regs + global register write block
@@ -433,6 +523,11 @@ module ics2115
             osc_select <= 5'd0;
             reg_select <= 8'd0;
             vmode      <= 8'd0;
+            irq_pending <= 8'd0;
+            irq_enabled <= 8'd0;
+            irqv_clear_osc   <= 1'b0;
+            irqv_clear_vol   <= 1'b0;
+            irqv_clear_voice <= 5'd0;
             for (int i = 0; i < NUM_VOICES; i++) begin
                 voice_regs[i].osc_acc   <= 29'd0;
                 voice_regs[i].osc_fc    <= 16'd0;
@@ -525,6 +620,7 @@ module ics2115
                             endcase
                         end else begin
                             case (reg_select)
+                                8'h4A: irq_enabled <= host_din[7:0];
                                 8'h4F: osc_select <= host_din[4:0];
                                 default: ;
                             endcase
@@ -532,6 +628,22 @@ module ics2115
                     end
                     default: ;
                 endcase
+            end
+
+            // ── IRQV auto-clear side-effect ──
+            // Register the clear request from the combinational scan
+            irqv_clear_osc   <= irqv_clear_osc_next;
+            irqv_clear_vol   <= irqv_clear_vol_next;
+            irqv_clear_voice <= irqv_clear_voice_next;
+
+            // Apply the clear from the PREVIOUS cycle's registered values
+            if (irqv_clear_osc || irqv_clear_vol) begin
+                if (!(seq_voice_wr && seq_wr_idx == irqv_clear_voice)) begin
+                    if (irqv_clear_osc)
+                        voice_regs[irqv_clear_voice].osc_conf[OSC_IRQ_PEND] <= 1'b0;
+                    if (irqv_clear_vol)
+                        voice_regs[irqv_clear_voice].vol_ctrl[VOL_IRQ_PEND] <= 1'b0;
+                end
             end
         end
     end
