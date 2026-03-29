@@ -402,8 +402,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Initialize Verilator
+    // Initialize Verilator (use static API — VerilatedContext has mutex issues
+    // with tracing on Verilator 5.018/macOS)
     Verilated::commandArgs(argc, argv);
+    Verilated::traceEverOn(true);
 
     auto top = std::make_unique<Vics2115>();
 
@@ -412,15 +414,13 @@ int main(int argc, char** argv) {
     s.top = top.get();
     s.tfp = nullptr;
 
-    // VCD tracing (optional)
-    VerilatedVcdC* tfp_raw = nullptr;
+    // VCD tracing (optional) — keep tfp alive for the whole function scope
+    std::unique_ptr<VerilatedVcdC> tfp;
     if (enable_vcd) {
-        Verilated::traceEverOn(true);
-        auto tfp = std::make_unique<VerilatedVcdC>();
-        tfp_raw = tfp.get();
-        top->trace(tfp_raw, 99);
-        tfp_raw->open(vcd_file);
-        s.tfp = tfp_raw;
+        tfp = std::make_unique<VerilatedVcdC>();
+        top->trace(tfp.get(), 99);
+        tfp->open(vcd_file);
+        s.tfp = tfp.get();
     }
 
     // Load ROM
@@ -460,8 +460,8 @@ int main(int argc, char** argv) {
     write_wav(wav_file, s.audio_samples, sample_rate);
 
     // Cleanup
-    if (tfp_raw) {
-        tfp_raw->close();
+    if (tfp) {
+        tfp->close();
     }
     top->final();
 

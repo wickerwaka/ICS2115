@@ -5,6 +5,7 @@
 At native playback rate (fc=0x0800), this gives one period per 1024 output samples.
 """
 import math
+import os
 import struct
 
 NUM_SAMPLES = 1024
@@ -13,7 +14,11 @@ AMPLITUDE = 32000  # slightly below 16-bit max to avoid clipping
 samples = [int(AMPLITUDE * math.sin(2 * math.pi * i / NUM_SAMPLES))
            for i in range(NUM_SAMPLES)]
 
-with open('test.rom', 'wb') as f:
+# Write to the same directory as this script (works from any cwd)
+script_dir = os.path.dirname(os.path.abspath(__file__))
+rom_path = os.path.join(script_dir, 'test.rom')
+
+with open(rom_path, 'wb') as f:
     for s in samples:
         f.write(struct.pack('<h', s))  # little-endian signed 16-bit
 

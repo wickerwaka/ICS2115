@@ -31,6 +31,9 @@ build: $(HDL_SRCS) $(TB_SRC)
 	$(MAKE) -C $(OBJ_DIR) -f $(PREFIX).mk
 
 run: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test.script -wav output.wav -no-vcd
+
+run-vcd: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test.script -wav output.wav -vcd trace.vcd
 
 clean:

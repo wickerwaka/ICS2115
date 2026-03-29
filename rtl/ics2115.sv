@@ -92,6 +92,30 @@ module ics2115
     end
 
     // =========================================================================
+    // Volume envelope rate counter
+    // =========================================================================
+    logic [8:0]  ramp_cnt;              // 9-bit counter, increments on sample_tick
+    logic        vol_rate_enable;       // gating signal for current voice's envelope
+
+    // Rate divider logic based on vol_incr[7:6] and ramp_cnt
+    always_comb begin
+        case (voice_regs[seq_voice_idx].vol_incr[7:6])
+            2'd0: vol_rate_enable = 1'b1;                                       // every tick
+            2'd1: vol_rate_enable = (ramp_cnt[2:0] == seq_voice_idx[2:0]);      // every 8th
+            2'd2: vol_rate_enable = (ramp_cnt[5:0] == {3'd0, seq_voice_idx[2:0]});  // every 64th
+            2'd3: vol_rate_enable = (ramp_cnt[8:0] == {6'd0, seq_voice_idx[2:0]});  // every 512th
+        endcase
+    end
+
+    // ramp_cnt increments once per sample_tick
+    always_ff @(posedge clk or negedge reset_n) begin
+        if (!reset_n)
+            ramp_cnt <= 9'd0;
+        else if (sample_tick)
+            ramp_cnt <= ramp_cnt + 9'd1;
+    end
+
+    // =========================================================================
     // Voice processing sequencer
     // =========================================================================
     typedef enum logic [2:0] {
@@ -140,6 +164,7 @@ module ics2115
         .voice_in      (osc_voice_in),
         .voice_out     (osc_voice_out),
         .vmode         (vmode),
+        .vol_rate_enable(vol_rate_enable),
         .rom_byte_addr (osc_rom_byte_addr),
         .rom_rd        (osc_rom_rd),
         .rom_data      (rom_data),
@@ -340,6 +365,7 @@ module ics2115
                                         // Keyoff
                                         voice_regs[osc_select].state_on        <= 1'b0;
                                         voice_regs[osc_select].osc_conf[OSC_STOP] <= 1'b1;
+                                        voice_regs[osc_select].vol_ctrl[VOL_STOP] <= 1'b1;
                                     end
                                 end
                                 5'h11: voice_regs[osc_select].osc_saddr        <= host_din[7:0];
