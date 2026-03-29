@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-irq run-timer run-s05-integration clean
+.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-all clean
 
 all: build
 
@@ -51,6 +51,14 @@ run-multi: build gen-multi-rom
 run-pan: build gen-multi-rom
 	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-vcd
 
+run-multi-check: build gen-multi-rom
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_multi.script -wav multi_output.wav -no-vcd
+	python3 analyze_wav.py multi_output.wav --min-peak 690
+
+run-pan-check: build gen-multi-rom
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-vcd
+	python3 analyze_wav.py pan_output.wav --check-separation
+
 run-readback: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_readback.script -wav /dev/null -no-vcd
 
@@ -62,6 +70,22 @@ run-timer: build
 
 run-s05-integration: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_s05_integration.script -wav /dev/null -no-vcd
+
+run-all: build gen-multi-rom
+	@echo "=== Running all tests ==="
+	@passed=0; failed=0; total=0; \
+	for target in run run-vol-env run-vol-loop run-multi-check run-pan-check run-readback run-irq run-timer run-s05-integration; do \
+	  total=$$((total + 1)); \
+	  echo "--- $$target ---"; \
+	  if $(MAKE) --no-print-directory $$target; then \
+	    passed=$$((passed + 1)); \
+	  else \
+	    failed=$$((failed + 1)); \
+	    echo "FAILED: $$target"; \
+	  fi; \
+	done; \
+	echo "=== Results: $$passed/$$total passed, $$failed failed ==="; \
+	test $$failed -eq 0
 
 clean:
 	rm -rf $(OBJ_DIR)

@@ -11,30 +11,30 @@ write 0x4F 0
 
 # osc_fc
 write 0x01 0x1234
-read 0x01
+expect 0x01 0x1234
 
 # osc_start_h (reg 0x02)
 write 0x02 0xABCD
-read 0x02
+expect 0x02 0xABCD
 
 # vol_pan (reg 0x0C)
 write 0x0C 0x8000
-read 0x0C
+expect 0x0C 0x8000
 
 # Select voice 1 and write a different value to verify per-voice isolation
 write 0x4F 1
 write 0x01 0x5678
-read 0x01
+expect 0x01 0x5678
 
 # Switch back to voice 0, confirm it retained its value
 write 0x4F 0
-read 0x01
+expect 0x01 0x1234
 
 # active_osc (reg 0x0E): default is 31 → expect 0x001F
-read 0x0E
+expect 0x0E 0x001F
 
 # chip revision (reg 0x4C): expect 0x0001
-read 0x4C
+expect 0x4C 0x0001
 
 # ==========================================================================
 # Part 2: Voice oscillator IRQ
@@ -83,13 +83,13 @@ write 0x10 0x0000
 wait_irq 5000000
 
 # Read IRQV — should show voice 0 with osc IRQ (expect 0x6000)
-read 0x0F
+expect 0x0F 0x6000
 
 # Wait for auto-clear to propagate
 wait 100
 
 # Read IRQV again — should be 0xFF00 (no pending)
-read 0x0F
+expect 0x0F 0xFF00
 
 # ==========================================================================
 # Part 3: Timer IRQ
@@ -109,13 +109,13 @@ write 0x42 0x0000
 wait_irq 1000000
 
 # Read timer status (0x43) — should show timer 0 pending (bit 0)
-read 0x43
+expect 0x43 0x0001
 
 # Read timer 0 preset (0x40) — returns 0x000A AND clears timer 0 IRQ
-read 0x40
+expect 0x40 0x000A
 
 # Read timer status again — timer 0 should be cleared
-read 0x43
+expect 0x43 0x0000
 
 # ==========================================================================
 # Part 4: Mixed IRQ sources / IRQV with timer
@@ -125,11 +125,11 @@ read 0x43
 wait_irq 1000000
 
 # Read timer status — should show timer 0 pending again (bit 0)
-read 0x43
+expect 0x43 0x0001
 
 # Read IRQV — timers don't appear in IRQV, only voice IRQs do
 # With no voice IRQ pending, IRQV should read 0xFF00
-read 0x0F
+expect 0x0F 0xFF00
 
 # Read irq_pending via register 0x4A — should show timer 0 bit set
 read 0x4A

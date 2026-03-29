@@ -24,12 +24,7 @@ write 0x02 0x0000
 write 0x03 0x0000
 
 # Set loop end = byte address 4 (20.9 format: 4 << 9 = 0x800)
-# osc_end[28:21] = 0x00, [20:13] = 0x00, [12:5] = 0x10, [4:0] = 0x00
-# Actually: 0x800 = 0b 0_00000000_00000100_000000000
-# Bits [28:21]=0x00, [20:13]=0x00, [12:9]=0x1, [8:5]=0x0
-# Reg 0x04: port3 = osc_end[28:21]=0x00, port2 = osc_end[20:13]=0x00
 write 0x04 0x0000
-# Reg 0x05: port3 = osc_end[12:5] = 0x10
 write 0x05 0x1000
 
 # Set volume to maximum
@@ -55,14 +50,10 @@ wait_irq 5000000
 # Expected: bit 7 clear (osc source), bits 4:0 = 0 (voice 0), bits 6:5 = 11
 # So result = 0b_0110_0000 = 0x60
 # In reg_read_data[15:8] format → 0x6000
-read 0x0F
+expect 0x0F 0x6000
 
-# Now verify IRQ has deasserted by reading port 0 status
-# After IRQV read auto-cleared the pending bit, host_irq should be 0
-# Port 0 bit 7 should be 0 (no IRQ active)
-# We use the UNTIL command to poll port 0 for bit 7 == 0
-# But first, let's just wait a few cycles for the clear to propagate
+# Wait for auto-clear to propagate
 wait 100
 
-# Read IRQV again — should now be 0xFF (no pending)
-read 0x0F
+# Read IRQV again — should now be 0xFF (no pending) → 0xFF00
+expect 0x0F 0xFF00

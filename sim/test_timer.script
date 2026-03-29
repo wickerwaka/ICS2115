@@ -17,16 +17,16 @@ write 0x42 0x0000
 wait_irq 1000000
 
 # Read timer status (0x43) — should show timer 0 pending (bit 0 set)
-read 0x43
+expect 0x43 0x0001
 
 # Read timer 0 preset (0x40) — should return 0x000A AND clear timer 0 IRQ
-read 0x40
+expect 0x40 0x000A
 
 # Read timer status again — should show timer 0 cleared (bit 0 = 0)
-read 0x43
+expect 0x43 0x0000
 
 # Wait for auto-reload to fire again
 wait_irq 1000000
 
 # Read timer status — should show timer 0 pending again
-read 0x43
+expect 0x43 0x0001
