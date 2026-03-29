@@ -1,0 +1,74 @@
+# ICS2115 Volume Envelope Test — One-shot Ramp Up
+# Programs voice 0 to play a sine wave with the volume envelope ramping
+# from silence (vol_acc=0) to maximum (vol_end=0xFF << 18).
+#
+# Expected behavior:
+#   - Audio starts near-silent (vol_acc=0 → max attenuation in vol table)
+#   - Volume increases over time as vol_acc ramps toward vol_end
+#   - When vol_acc reaches vol_end, vol_ctrl.done is set
+#   - Voice continues playing at final volume (done only stops envelope updates)
+#
+# vol_incr = 0x04: rate=0 (every tick), magnitude=4 (slow ramp)
+# Ramp duration: (0xFF << 18) / (4 << 9) ≈ 32640 sample ticks
+# At ~52k total samples, ramp occupies ~63% of output — clearly audible growth
+
+# Select voice 0
+write 0x4F 0x0000
+
+# Set active_osc = 31 (all 32 voices active)
+write 0x0E 0x1F00
+
+# Set frequency counter: fc = 0x6000 → ~387 Hz at 33075 Hz
+write 0x01 0x6000
+
+# Set oscillator accumulator = 0 (start of ROM)
+write 0x0A 0x0000
+write 0x0B 0x0000
+
+# Set sample bank address = 0
+write 0x11 0x0000
+
+# Set loop start = 0
+write 0x02 0x0000
+write 0x03 0x0000
+
+# Set loop end = byte address 2046 (last sample), same as test.script
+# 20.9 format: 2046 << 9 = 0x000FFC00
+write 0x04 0x007F
+write 0x05 0xE000
+
+# Set osc_conf: loop=1 (bit 3) — forward loop mode
+write 0x00 0x0800
+
+# --- Volume envelope setup ---
+
+# vol_incr = 0x04: rate bits [7:6]=0 (every tick), magnitude [5:0]=4 (slow)
+# Port 3 write: vol_incr <= high byte
+write 0x06 0x0400
+
+# vol_start = 0 (silence)
+# Port 2 write: vol_start <= {low_byte, 18'd0}
+write 0x07 0x0000
+
+# vol_end = 0xFF << 18 (near-maximum)
+# Port 2 write: vol_end <= {low_byte, 18'd0}
+write 0x08 0x00FF
+
+# vol_acc = 0 (start at silence)
+# Port 3: vol_acc[25:18] = 0, Port 2: vol_acc[17:10] = 0
+write 0x09 0x0000
+
+# vol_ctrl = 0x00: increasing (invert=0), no loop, not done, not stopped
+# Port 3 write: vol_ctrl[6:0] <= high byte
+write 0x0D 0x0000
+
+# Pan = center (0x7F)
+write 0x0C 0x7F00
+
+# Keyon: write 0x00 to osc_ctl → triggers state_on=1, ramp=64, clears osc_stop
+write 0x10 0x0000
+
+# Wait for ramp to complete and accumulate audio samples
+# ~2073 samples for ramp + extra samples at final volume
+# 80M sys clocks ≈ 50k+ audio samples
+wait 80000000

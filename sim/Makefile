@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run clean
+.PHONY: all build run run-vcd run-vol-env run-vol-loop clean
 
 all: build
 
@@ -35,6 +35,12 @@ run: build
 
 run-vcd: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test.script -wav output.wav -vcd trace.vcd
+
+run-vol-env: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_env.script -wav vol_env_output.wav -no-vcd
+
+run-vol-loop: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_loop.script -wav vol_loop_output.wav -no-vcd
 
 clean:
 	rm -rf $(OBJ_DIR)
