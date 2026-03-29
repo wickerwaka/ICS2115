@@ -91,7 +91,7 @@ run-pwrite-test: build
 run-mame-log: build
 	@if [ -z "$(LOG)" ]; then echo "Usage: make run-mame-log LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
 	@if [ -z "$(ROM)" ]; then echo "Usage: make run-mame-log LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
-	python3 mame_log_to_script.py $(LOG) mame_converted.script
+	python3 convert_mame_log.py $(LOG) -o mame_converted.script
 	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-vcd
 
 run-all: build gen-multi-rom
