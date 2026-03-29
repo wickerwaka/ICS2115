@@ -374,7 +374,7 @@ module ics2115
                             endcase
                         end else begin
                             case (reg_select)
-                                8'h4F: osc_select <= host_din[4:0];
+                                // No high-byte global registers currently
                                 default: ;
                             endcase
                         end
@@ -394,6 +394,11 @@ module ics2115
                                 end
                                 5'h0A: voice_regs[osc_select].osc_acc[20:13]    <= host_din[7:0];
                                 5'h0B: voice_regs[osc_select].osc_acc[4:0]      <= host_din[7:3];
+                                default: ;
+                            endcase
+                        end else begin
+                            case (reg_select)
+                                8'h4F: osc_select <= host_din[4:0];
                                 default: ;
                             endcase
                         end
