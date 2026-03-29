@@ -448,7 +448,7 @@ module ics2115
                 8'h4A: reg_read_data = {8'h00, irq_pending};
 
                 // 0x4B: Address of Interrupting Oscillator — fixed 0x80
-                8'h4B: reg_read_data = {8'h80, 8'h00};
+                8'h4B: reg_read_data = {8'h00, 8'h80};
 
                 // 0x4C: Chip Revision
                 8'h4C: reg_read_data = {8'h00, CHIP_REVISION};
@@ -507,7 +507,7 @@ module ics2115
     always_comb begin
         timer_irq_clear_next[0] = 1'b0;
         timer_irq_clear_next[1] = 1'b0;
-        if (host_rd_pulse && host_addr == 2'd3) begin
+        if (host_rd_pulse && (host_addr == 2'd2 || host_addr == 2'd3)) begin
             if (reg_select == 8'h40)
                 timer_irq_clear_next[0] = 1'b1;
             else if (reg_select == 8'h41)
