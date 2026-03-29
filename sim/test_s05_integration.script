@@ -1,0 +1,138 @@
+# test_s05_integration.script — S05 integration test
+# Exercises register read-back, voice oscillator IRQ, timer IRQ,
+# and IRQV polling in a single run.
+
+# ==========================================================================
+# Part 1: Write-read round-trip (register read-back)
+# ==========================================================================
+
+# Select voice 0
+write 0x4F 0
+
+# osc_fc
+write 0x01 0x1234
+read 0x01
+
+# osc_start_h (reg 0x02)
+write 0x02 0xABCD
+read 0x02
+
+# vol_pan (reg 0x0C)
+write 0x0C 0x8000
+read 0x0C
+
+# Select voice 1 and write a different value to verify per-voice isolation
+write 0x4F 1
+write 0x01 0x5678
+read 0x01
+
+# Switch back to voice 0, confirm it retained its value
+write 0x4F 0
+read 0x01
+
+# active_osc (reg 0x0E): default is 31 → expect 0x001F
+read 0x0E
+
+# chip revision (reg 0x4C): expect 0x0001
+read 0x4C
+
+# ==========================================================================
+# Part 2: Voice oscillator IRQ
+# ==========================================================================
+
+# Select voice 0
+write 0x4F 0
+
+# Set active_osc = 31 (all 32 voices)
+write 0x0E 0x1F00
+
+# Maximum frequency for fast boundary hit
+write 0x01 0xFFFF
+
+# Oscillator accumulator = 0
+write 0x0A 0x0000
+write 0x0B 0x0000
+
+# Sample bank = 0
+write 0x11 0x0000
+
+# Loop start = 0
+write 0x02 0x0000
+write 0x03 0x0000
+
+# Loop end = small (byte addr 4 → 0x800 in 20.9)
+write 0x04 0x0000
+write 0x05 0x1000
+
+# Volume max
+write 0x09 0xFFFF
+
+# Pan center
+write 0x0C 0x7F00
+
+# osc_conf: IRQ enabled (bit 5), no loop, not stopped
+write 0x00 0x2000
+
+# vol_ctrl: done=1 to prevent volume envelope
+write 0x0D 0x0100
+
+# Key-on voice 0
+write 0x10 0x0000
+
+# Wait for oscillator IRQ
+wait_irq 5000000
+
+# Read IRQV — should show voice 0 with osc IRQ (expect 0x6000)
+read 0x0F
+
+# Wait for auto-clear to propagate
+wait 100
+
+# Read IRQV again — should be 0xFF00 (no pending)
+read 0x0F
+
+# ==========================================================================
+# Part 3: Timer IRQ
+# ==========================================================================
+
+# Enable timer 0 IRQ (bit 0 of irq_enabled register 0x4A)
+write 0x4A 0x0001
+
+# Set timer 0 preset = 10
+write 0x40 0x000A
+
+# Set timer 0 prescale = 0
+# period = 1 * 11 << 4 = 176 ce ticks
+write 0x42 0x0000
+
+# Wait for timer IRQ
+wait_irq 1000000
+
+# Read timer status (0x43) — should show timer 0 pending (bit 0)
+read 0x43
+
+# Read timer 0 preset (0x40) — returns 0x000A AND clears timer 0 IRQ
+read 0x40
+
+# Read timer status again — timer 0 should be cleared
+read 0x43
+
+# ==========================================================================
+# Part 4: Mixed IRQ sources / IRQV with timer
+# ==========================================================================
+
+# Wait for timer to fire again (auto-reload)
+wait_irq 1000000
+
+# Read timer status — should show timer 0 pending again (bit 0)
+read 0x43
+
+# Read IRQV — timers don't appear in IRQV, only voice IRQs do
+# With no voice IRQ pending, IRQV should read 0xFF00
+read 0x0F
+
+# Read irq_pending via register 0x4A — should show timer 0 bit set
+read 0x4A
+
+# Clear timer by reading preset
+read 0x40

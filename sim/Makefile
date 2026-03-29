@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-irq run-timer clean
+.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-irq run-timer run-s05-integration clean
 
 all: build
 
@@ -59,6 +59,9 @@ run-irq: build
 
 run-timer: build
 	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_timer.script -wav /dev/null -no-vcd
+
+run-s05-integration: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_s05_integration.script -wav /dev/null -no-vcd
 
 clean:
 	rm -rf $(OBJ_DIR)
