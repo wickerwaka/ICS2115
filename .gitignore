@@ -26,3 +26,6 @@ vendor/
 coverage/
 .cache/
 tmp/
+
+# Verilog dump files
+*.vcd
