@@ -322,11 +322,12 @@ static void execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
             printf("[%zu] read reg 0x%02X (stub — no readback in S02)\n", i, cmd.reg);
             break;
 
-        case CmdType::WAIT:
+        case CmdType::WAIT: {
             printf("[%zu] wait %llu cycles\n", i, (unsigned long long)cmd.cycles);
             for (uint64_t c = 0; c < cmd.cycles; c++)
                 tick(s);
             break;
+        }
 
         case CmdType::WAIT_IRQ: {
             printf("[%zu] wait_irq (timeout %llu)\n", i, (unsigned long long)cmd.cycles);

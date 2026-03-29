@@ -39,7 +39,7 @@ module ics2115_tables (
         end
     end
 
-    // Registered output — 1 cycle latency
+    // Registered output — 1 cycle latency from address input
     always_ff @(posedge clk) begin
         vol_data <= vol_mem[vol_addr];
     end

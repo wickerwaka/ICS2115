@@ -55,15 +55,17 @@ module ics2115_osc
         ST_VOL_LOOKUP     = 4'd1,
         ST_PAN_LOOKUP_L   = 4'd2,
         ST_PAN_LOOKUP_R   = 4'd3,
-        ST_SAMPLE_FETCH_1 = 4'd4,
-        ST_SAMPLE_FETCH_2 = 4'd5,
-        ST_SAMPLE_WAIT    = 4'd6,
-        ST_INTERPOLATE    = 4'd7,
-        ST_MIX            = 4'd8,
-        ST_OSC_UPDATE     = 4'd9,
-        ST_BOUNDARY_CHECK = 4'd10,
-        ST_RAMP_UPDATE    = 4'd11,
-        ST_DONE           = 4'd12
+        ST_VOL_WAIT_L     = 4'd4,     // wait for left vol table result
+        ST_SAMPLE_FETCH_1 = 4'd5,
+        ST_VOL_WAIT_R     = 4'd6,     // wait for right vol table result
+        ST_SAMPLE_FETCH_2 = 4'd7,
+        ST_SAMPLE_WAIT    = 4'd8,
+        ST_INTERPOLATE    = 4'd9,
+        ST_MIX            = 4'd10,
+        ST_OSC_UPDATE     = 4'd11,
+        ST_BOUNDARY_CHECK = 4'd12,
+        ST_RAMP_UPDATE    = 4'd13,
+        ST_DONE           = 4'd14
     } osc_state_t;
 
     osc_state_t state, state_next;
@@ -154,8 +156,10 @@ module ics2115_osc
             ST_IDLE:           if (start) state_next = ST_VOL_LOOKUP;
             ST_VOL_LOOKUP:     state_next = ST_PAN_LOOKUP_L;
             ST_PAN_LOOKUP_L:   state_next = ST_PAN_LOOKUP_R;
-            ST_PAN_LOOKUP_R:   state_next = ST_SAMPLE_FETCH_1;
-            ST_SAMPLE_FETCH_1: state_next = ST_SAMPLE_FETCH_2;
+            ST_PAN_LOOKUP_R:   state_next = ST_VOL_WAIT_L;
+            ST_VOL_WAIT_L:     state_next = ST_SAMPLE_FETCH_1;
+            ST_SAMPLE_FETCH_1: state_next = ST_VOL_WAIT_R;
+            ST_VOL_WAIT_R:     state_next = ST_SAMPLE_FETCH_2;
             ST_SAMPLE_FETCH_2: state_next = ST_SAMPLE_WAIT;
             ST_SAMPLE_WAIT:    state_next = ST_INTERPOLATE;
             ST_INTERPOLATE:    state_next = ST_MIX;
@@ -272,13 +276,22 @@ module ics2115_osc
                 end
 
                 // ─────────────────────────────────────────────────────────────
+                // VOL_WAIT_L: Wait for left volume table registered output.
+                // The vol_tbl_addr was set in ST_PAN_LOOKUP_R. Table registers
+                // it this cycle. Result available next cycle (ST_SAMPLE_FETCH_1).
+                // ─────────────────────────────────────────────────────────────
+                ST_VOL_WAIT_L: begin
+                    // Nothing to do — just waiting for vol table pipeline
+                end
+
+                // ─────────────────────────────────────────────────────────────
                 // SAMPLE_FETCH_1: Read left vol result, issue right vol lookup,
                 // issue first ROM read (sample1)
                 // ─────────────────────────────────────────────────────────────
                 ST_SAMPLE_FETCH_1: begin
                     // Left volume arrived (1-cycle latency). Apply ramp.
                     if (vlefti_s > 13'sd0)
-                        vleft <= (vol_tbl_data * {9'd0, v.state_ramp}) >> RAMP_SHIFT;
+                        vleft <= ({16'd0, vol_tbl_data} * {25'd0, v.state_ramp}) >> RAMP_SHIFT;
                     else
                         vleft <= 16'd0;
 
@@ -294,13 +307,23 @@ module ics2115_osc
                 end
 
                 // ─────────────────────────────────────────────────────────────
+                // VOL_WAIT_R: Wait for right volume table + ROM data pipeline.
+                // vol_tbl_addr for right was set in ST_SAMPLE_FETCH_1.
+                // ROM read for sample1 was issued in ST_SAMPLE_FETCH_1.
+                // Both registered outputs arrive next cycle (ST_SAMPLE_FETCH_2).
+                // ─────────────────────────────────────────────────────────────
+                ST_VOL_WAIT_R: begin
+                    // Nothing to do — just waiting for vol table + ROM pipeline
+                end
+
+                // ─────────────────────────────────────────────────────────────
                 // SAMPLE_FETCH_2: ROM data for sample1 arrived. Latch sample1.
                 // Read right vol result. Issue ROM read for sample2.
                 // ─────────────────────────────────────────────────────────────
                 ST_SAMPLE_FETCH_2: begin
                     // Right volume arrived. Apply ramp.
                     if (vrighti_s > 13'sd0)
-                        vright <= (vol_tbl_data * {9'd0, v.state_ramp}) >> RAMP_SHIFT;
+                        vright <= ({16'd0, vol_tbl_data} * {25'd0, v.state_ramp}) >> RAMP_SHIFT;
                     else
                         vright <= 16'd0;
 

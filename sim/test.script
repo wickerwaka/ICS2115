@@ -1,0 +1,75 @@
+# ICS2115 single-voice playback test
+# Programs voice 0 to play a 16-bit sine wave from ROM in forward loop mode.
+#
+# Register write format: write <reg> <value16>
+#   testbench sends: port 3 = (value>>8)&0xFF (high byte)
+#                    port 2 = value&0xFF       (low byte)
+#
+# ROM: 1024 x 16-bit signed sine wave, little-endian (2048 bytes)
+# Addressing: 20.9 fixed-point. byte_addr = acc[28:12]
+# osc_fc update: acc += {11'd0, osc_fc, 2'b00}  (fc << 2)
+# To advance 1 byte per step: fc = 1 * 2^12 / 4 = 1024 = 0x0400
+# To advance 2 bytes (1 sample) per step: fc = 2048 = 0x0800
+# fc=0x6000 → ~12 samples/step → ~387 Hz at 33075 Hz sample rate
+
+# Select voice 0
+write 0x4F 0x0000
+
+# Set active_osc = 31 (all 32 voices)
+write 0x0E 0x1F00
+
+# Set frequency counter for ~387 Hz playback
+# fc = 0x6000, port 3 = 0x60 → osc_fc[15:8], port 2 = 0x00 → osc_fc[7:0]
+write 0x01 0x6000
+
+# Set oscillator accumulator to start of ROM
+# osc_acc = 0 (29-bit)
+# Reg 0x0A: port 3 → acc[28:21]=0, port 2 → acc[20:13]=0
+write 0x0A 0x0000
+# Reg 0x0B: port 3 → acc[12:5]=0, port 2 → acc[4:0]=0
+write 0x0B 0x0000
+
+# Set sample bank address = 0
+write 0x11 0x0000
+
+# Set loop start = 0 (byte addr 0 in 20.9 format = 0)
+# Reg 0x02: port 3 → osc_start[28:21]=0, port 2 → osc_start[20:13]=0
+write 0x02 0x0000
+# Reg 0x03: port 3 → osc_start[12:5]=0
+write 0x03 0x0000
+
+# Set loop end = byte address 2046 (last 16-bit sample)
+# 20.9 format: 2046 << 9 = 1047552 = 0x000FFC00 (29-bit)
+# Bits [28:21] = 0x00, [20:13] = 0x7F, [12:5] = 0xE0, [4:0] = 0x00
+# Reg 0x04: port 3 = 0x00 → osc_end[28:21], port 2 = 0x7F → osc_end[20:13]
+write 0x04 0x007F
+# Reg 0x05: port 3 = 0xE0 → osc_end[12:5]
+write 0x05 0xE000
+
+# Set volume to maximum
+# vol_acc is 26-bit. Reg 0x09: port 3 → vol_acc[25:18], port 2 → vol_acc[17:10]
+write 0x09 0xFFFF
+
+# Set pan to center (0x7F)
+# Reg 0x0C: port 3 → vol_pan
+write 0x0C 0x7F00
+
+# Set osc_conf: loop=1 (bit 3), all others 0
+# Reg 0x00: port 3 → osc_conf[6:0] = 0x08
+write 0x00 0x0800
+
+# Set vol_ctrl: done=1 (bit 0) to prevent volume envelope updates
+# Reg 0x0D: port 3 → vol_ctrl[6:0] = 0x01
+write 0x0D 0x0100
+
+# Key on: write 0x00 to osc_ctl
+# Reg 0x10: port 3 = 0x00 → triggers keyon (state_on=1, ramp=64, stop cleared)
+write 0x10 0x0000
+
+# Wait for ~50000 sample periods of audio
+# 32 voices × 32 CE per sample = 1024 CE per sample tick
+# 50000 samples × 1024 CE = 51.2M CE cycles
+# CE rate = 33.8688 MHz, sys clk = 50 MHz
+# CE cycles per sys clk ≈ 0.677
+# Sys clocks needed ≈ 51.2M / 0.677 ≈ 75.6M
+wait 80000000
