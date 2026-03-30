@@ -4,6 +4,14 @@
 #
 # osc_conf: LOOP (bit 3) + EIGHTBIT (bit 2) = 0x0C
 # Verifies: osc_conf readback, nonzero audio output
+#
+# Address mapping: RTL uses 29-bit acc with 20.9 fixed-point.
+# byte_addr = acc[28:9]. To address byte B: acc = B << 9.
+# Register write mapping:
+#   reg_hi port3 (high byte) → acc[28:21]
+#   reg_hi port2 (low byte)  → acc[20:13]
+#   reg_lo port3 (high byte) → acc[12:5]
+#   reg_lo port2 (low byte)  → acc[4:0] from din[7:3]
 
 # Select voice 0
 write 0x4F 0x0000
@@ -15,26 +23,27 @@ write 0x0E 0x1F00
 write 0x01 0x6000
 
 # Oscillator accumulator = byte 0x1000 (start of 8-bit region)
-# acc = 0x1000 << 12 = 0x01000000
-# reg 0x0A: [28:21]=0x08, [20:13]=0x00 → 0x0800
+# acc = 0x1000 << 9 = 0x00200000
+# reg 0x0A: [28:21]=0x01, [20:13]=0x00 → 0x0100
 # reg 0x0B: [12:5]=0x00, [4:0]=0x00 → 0x0000
-write 0x0A 0x0800
+write 0x0A 0x0100
 write 0x0B 0x0000
 
 # Sample bank = 0
 write 0x11 0x0000
 
 # Loop start = byte 0x1000
-# reg 0x02: 0x0800, reg 0x03: 0x0000
-write 0x02 0x0800
+# acc = 0x1000 << 9 = 0x00200000
+# reg 0x02: 0x0100, reg 0x03: 0x0000
+write 0x02 0x0100
 write 0x03 0x0000
 
 # Loop end = byte 0x13FF (last 8-bit sample)
-# acc = 0x13FF << 12 = 0x013FF000
-# reg 0x04: [28:21]=0x09, [20:13]=0xFF → 0x09FF
-# reg 0x05: [12:5]=0x80, [4:0]=0x00 → 0x8000
-write 0x04 0x09FF
-write 0x05 0x8000
+# acc = 0x13FF << 9 = 0x0027FE00
+# reg 0x04: [28:21]=0x01, [20:13]=0x3F → 0x013F
+# reg 0x05: [12:5]=0xF0, [4:0]=0x00 → 0xF000
+write 0x04 0x013F
+write 0x05 0xF000
 
 # Volume max
 write 0x09 0xFFFF
@@ -55,16 +64,6 @@ write 0x10 0x0000
 wait 2000000
 
 # Verify osc_conf readback has eightbit and loop bits set
-# osc_conf is read from reg 0x00 in high byte, with state_on merged into bit 3
-# state_on=1, loop=1 → bit 3 shows state_on (1), eightbit=bit 2 (1)
-# osc_conf[6:0] = 0x0C, plus state_on in bit 3 readback.
-# Actually: the read merges state_on into bit 3: {osc_conf[7:4], state_on, osc_conf[2:0]}
-# osc_conf = 0x0C = 0b0000_1100, state_on=1
-# readback high byte = {0000, 1, 100} = 0b0000_1100 = 0x0C
-# But state_on replaces bit 3: {conf[7:4], state_on, conf[2:0]}
-# conf[7:4]=0x0, state_on=1, conf[2:0]=0b100
-# = 0b0000_1_100 = 0x0C — same value since loop bit=1 and state_on=1
-# Use mask 0x0400 to check eightbit bit (bit 2 in high byte = bit 10)
 expect 0x00 0x0C00 0x0C00
 
 # Let it play more for WAV output

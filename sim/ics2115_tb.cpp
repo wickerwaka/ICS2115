@@ -1,7 +1,7 @@
 #include "Vics2115.h"
 #include "Vics2115___024root.h"
 #include "verilated.h"
-#include "verilated_vcd_c.h"
+#include "verilated_fst_c.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -40,7 +40,7 @@ struct ScriptCmd {
 // ---------------------------------------------------------------------------
 struct SimState {
     Vics2115*       top;
-    VerilatedVcdC*  tfp;        // nullptr when VCD disabled
+    VerilatedFstC*  tfp;        // nullptr when FST disabled
     uint64_t        sim_time = 0;
     uint64_t        tick_count = 0;  // total tick() calls
 
@@ -600,9 +600,9 @@ int main(int argc, char** argv) {
     const char* rom_file    = nullptr;
     const char* script_file = nullptr;
     const char* wav_file    = "output.wav";
-    const char* vcd_file    = "trace.vcd";
+    const char* fst_file    = "trace.fst";
     uint32_t    sample_rate = 33075;
-    bool        enable_vcd  = true;
+    bool        enable_fst  = true;
 
     // Parse arguments
     for (int i = 1; i < argc; i++) {
@@ -612,19 +612,19 @@ int main(int argc, char** argv) {
             script_file = argv[++i];
         else if (!strcmp(argv[i], "-wav") && i + 1 < argc)
             wav_file = argv[++i];
-        else if (!strcmp(argv[i], "-vcd") && i + 1 < argc)
-            vcd_file = argv[++i];
+        else if (!strcmp(argv[i], "-fst") && i + 1 < argc)
+            fst_file = argv[++i];
         else if (!strcmp(argv[i], "-sample-rate") && i + 1 < argc)
             sample_rate = std::stoul(argv[++i]);
-        else if (!strcmp(argv[i], "-no-vcd"))
-            enable_vcd = false;
+        else if (!strcmp(argv[i], "-no-fst"))
+            enable_fst = false;
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
             printf("Usage: %s [options]\n"
                    "  -rom <file>          ROM binary file (required)\n"
                    "  -script <file>       Script file (required)\n"
                    "  -wav <file>          Output WAV file (default: output.wav)\n"
-                   "  -vcd <file>          Output VCD file (default: trace.vcd)\n"
-                   "  -no-vcd              Skip VCD generation (saves disk space)\n"
+                   "  -fst <file>          Output FST file (default: trace.fst)\n"
+                   "  -no-fst              Skip FST generation (saves disk space)\n"
                    "  -sample-rate <hz>    WAV sample rate (default: 33075)\n",
                    argv[0]);
             return 0;
@@ -651,12 +651,12 @@ int main(int argc, char** argv) {
     s.top = top.get();
     s.tfp = nullptr;
 
-    // VCD tracing (optional) — keep tfp alive for the whole function scope
-    std::unique_ptr<VerilatedVcdC> tfp;
-    if (enable_vcd) {
-        tfp = std::make_unique<VerilatedVcdC>();
+    // FST tracing (optional) — keep tfp alive for the whole function scope
+    std::unique_ptr<VerilatedFstC> tfp;
+    if (enable_fst) {
+        tfp = std::make_unique<VerilatedFstC>();
         top->trace(tfp.get(), 99);
-        tfp->open(vcd_file);
+        tfp->open(fst_file);
         s.tfp = tfp.get();
     }
 
@@ -704,8 +704,8 @@ int main(int argc, char** argv) {
 
     printf("Simulation complete. %zu audio frames captured. %llu ticks total.\n",
            s.audio_samples.size() / 2, (unsigned long long)s.tick_count);
-    if (enable_vcd)
-        printf("VCD: %s\n", vcd_file);
+    if (enable_fst)
+        printf("FST: %s\n", fst_file);
 
     return errors < 255 ? errors : 255;
 }

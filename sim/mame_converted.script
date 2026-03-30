@@ -1,5 +1,5 @@
 # Converted from bootup.log
-# Generated 2026-03-29T19:07:43.655324
+# Generated 2026-03-29T20:15:59.565631
 # wait_irq timeout: 10000000 cycles
 #
 pwrite 0x01 0x5A

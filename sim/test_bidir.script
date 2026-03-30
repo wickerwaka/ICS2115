@@ -3,7 +3,10 @@
 # When accumulator hits loop end, direction inverts (OSC_INVERT toggles).
 #
 # osc_conf: BIDIR (bit 4) + LOOP (bit 3) = 0x18
-# Uses 16-bit sine from ROM byte 0x0000 (test.rom or multi_test.rom)
+# Uses 16-bit sine from ROM byte 0x0000 (multi_test.rom)
+#
+# Address mapping: RTL uses 29-bit acc with 20.9 fixed-point.
+# byte_addr = acc[28:9]. To address byte B: acc = B << 9.
 
 # Select voice 0
 write 0x4F 0x0000
@@ -27,11 +30,11 @@ write 0x02 0x0000
 write 0x03 0x0000
 
 # Loop end = byte 0x07FE (last 16-bit sample in sine region)
-# acc = 0x07FE << 12 = 0x007FE000
-# reg 0x04: [28:21]=0x03, [20:13]=0xFF → 0x03FF
-# reg 0x05: [12:5]=0x00, [4:0]=0x00 → 0x0000
-write 0x04 0x03FF
-write 0x05 0x0000
+# acc = 0x07FE << 9 = 0x000FFC00
+# reg 0x04: [28:21]=0x00, [20:13]=0x7F → 0x007F
+# reg 0x05: [12:5]=0xE0, [4:0]=0x00 → 0xE000
+write 0x04 0x007F
+write 0x05 0xE000
 
 # Volume max
 write 0x09 0xFFFF
@@ -49,15 +52,10 @@ write 0x0D 0x0100
 write 0x10 0x0000
 
 # Wait enough cycles for oscillator to traverse forward and hit boundary
-# At max freq, osc steps ~0x3FFFC per tick. With 2048 byte range,
-# boundary is reached in a few ticks. Wait a bit then check invert.
 wait 1000000
 
 # After boundary hit, OSC_INVERT (bit 6) should toggle to 1
-# osc_conf initial = 0x18, after bidir boundary → invert flips → 0x58
-# readback with state_on=1: 0x58 | 0x08 = 0x58 (bit 3 already set)
 # Check that invert bit (bit 6 = 0x40 in conf) is set
-# Mask 0x4000 checks just the invert bit in readback high byte
 expect 0x00 0x4000 0x4000
 
 # Let it play more — should bounce back and forth producing audio

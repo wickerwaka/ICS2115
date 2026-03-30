@@ -12,7 +12,7 @@ HDL_SRCS := $(HDL_DIR)/ics2115_pkg.sv \
 
 TB_SRC := ics2115_tb.cpp
 
-VFLAGS := --cc --exe --trace \
+VFLAGS := --cc --exe --trace-fst \
           --top-module $(TOP_MODULE) \
           --prefix $(PREFIX) \
           --Mdir $(OBJ_DIR) \
@@ -22,7 +22,7 @@ VFLAGS := --cc --exe --trace \
           -Wno-LATCH -Wno-MULTIDRIVEN \
           -CFLAGS "-std=c++17 -O2"
 
-.PHONY: all build run run-vcd run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-pwrite-test run-mame-log run-mame-analysis run-all clean
+.PHONY: all build run run-fst run-vol-env run-vol-loop gen-multi-rom run-multi run-pan run-multi-check run-pan-check run-irq run-timer run-s05-integration run-8bit run-ulaw run-bidir run-vol-irq run-pwrite-test run-mame-log run-mame-analysis run-all clean
 
 all: build
 
@@ -31,74 +31,74 @@ build: $(HDL_SRCS) $(TB_SRC)
 	$(MAKE) -C $(OBJ_DIR) -f $(PREFIX).mk
 
 run: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test.script -wav output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test.script -wav output.wav -no-fst
 
-run-vcd: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test.script -wav output.wav -vcd trace.vcd
+run-fst: build
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test.script -wav output.wav -fst trace.fst
 
 run-vol-env: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_env.script -wav vol_env_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_env.script -wav vol_env_output.wav -no-fst
 
 run-vol-loop: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_loop.script -wav vol_loop_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_loop.script -wav vol_loop_output.wav -no-fst
 
 gen-multi-rom:
 	python3 gen_multi_rom.py
 
 run-multi: build gen-multi-rom
-	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_multi.script -wav multi_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_multi.script -wav multi_output.wav -no-fst
 
 run-pan: build gen-multi-rom
-	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-fst
 
 run-multi-check: build gen-multi-rom
-	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_multi.script -wav multi_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_multi.script -wav multi_output.wav -no-fst
 	python3 analyze_wav.py multi_output.wav --min-peak 690
 
 run-pan-check: build gen-multi-rom
-	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_pan.script -wav pan_output.wav -no-fst
 	python3 analyze_wav.py pan_output.wav --check-separation
 
 run-readback: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_readback.script -wav /dev/null -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_readback.script -wav /dev/null -no-fst
 
 run-irq: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_irq.script -wav /dev/null -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_irq.script -wav /dev/null -no-fst
 
 run-timer: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_timer.script -wav /dev/null -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_timer.script -wav /dev/null -no-fst
 
 run-s05-integration: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_s05_integration.script -wav /dev/null -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_s05_integration.script -wav /dev/null -no-fst
 
 run-8bit: build gen-multi-rom
-	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_8bit.script -wav 8bit_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_8bit.script -wav 8bit_output.wav -no-fst
 	python3 analyze_wav.py 8bit_output.wav --min-peak 1
 
 run-ulaw: build gen-multi-rom
-	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_ulaw.script -wav ulaw_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_ulaw.script -wav ulaw_output.wav -no-fst
 	python3 analyze_wav.py ulaw_output.wav --min-peak 1
 
 run-bidir: build gen-multi-rom
-	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_bidir.script -wav bidir_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom multi_test.rom -script test_bidir.script -wav bidir_output.wav -no-fst
 
 run-vol-irq: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_irq.script -wav vol_irq_output.wav -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_vol_irq.script -wav vol_irq_output.wav -no-fst
 
 run-pwrite-test: build
-	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_port.script -wav /dev/null -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom test.rom -script test_port.script -wav /dev/null -no-fst
 
 run-mame-log: build
 	@if [ -z "$(LOG)" ]; then echo "Usage: make run-mame-log LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
 	@if [ -z "$(ROM)" ]; then echo "Usage: make run-mame-log LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
 	python3 convert_mame_log.py $(LOG) -o mame_converted.script
-	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-vcd
+	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-fst
 
 run-mame-analysis: build
 	@if [ -z "$(LOG)" ]; then echo "Usage: make run-mame-analysis LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
 	@if [ -z "$(ROM)" ]; then echo "Usage: make run-mame-analysis LOG=<mame_csv> ROM=<rom_file>"; exit 1; fi
 	python3 convert_mame_log.py $(LOG) -o mame_converted.script
-	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-vcd 2>/dev/null | python3 analyze_mame_divergence.py
+	./$(OBJ_DIR)/$(PREFIX) -rom $(ROM) -script mame_converted.script -wav /dev/null -no-fst 2>/dev/null | python3 analyze_mame_divergence.py
 
 run-all: build gen-multi-rom
 	@echo "=== Running all tests ==="
