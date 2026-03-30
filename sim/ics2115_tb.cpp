@@ -201,8 +201,8 @@ static std::vector<uint16_t> load_rom(const char* filename) {
     size_t word_count = (raw.size() + 1) / 2;
     std::vector<uint16_t> rom(word_count, 0);
     for (size_t i = 0; i < raw.size(); i += 2) {
-        uint16_t lo = raw[i];
-        uint16_t hi = (i + 1 < raw.size()) ? raw[i + 1] : 0;
+        uint16_t hi = raw[i];
+        uint16_t lo = (i + 1 < raw.size()) ? raw[i + 1] : 0;
         rom[i / 2] = (hi << 8) | lo;
     }
 
