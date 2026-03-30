@@ -12,8 +12,8 @@ module ics2115
 
     // Host bus interface — matches one-shot port signature for testbench reuse
     input  logic [1:0]  host_addr,
-    input  logic [15:0] host_din,
-    output logic [15:0] host_dout,
+    input  logic [7:0]  host_din,
+    output logic [7:0]  host_dout,
     input  logic        host_cs_n,
     input  logic        host_rd_n,
     input  logic        host_wr_n,
@@ -519,7 +519,7 @@ module ics2115
         case (host_addr)
             2'd0: begin
                 // Port 0: IRQ status — MAME read() case 0
-                host_dout = 16'd0;
+                host_dout = 8'd0;
                 if (irq_on) begin
                     host_dout[7] = 1'b1;  // bit 7: any IRQ active
                     if (irq_enabled != 8'd0 && (irq_pending & 8'h03) != 8'h00)
@@ -528,10 +528,10 @@ module ics2115
                         host_dout[1] = 1'b1;  // bit 1: voice osc IRQ pending
                 end
             end
-            2'd1: host_dout = {8'h00, reg_select};                // reg_select echo
-            2'd2: host_dout = {8'h00, reg_read_data[7:0]};       // low byte
-            2'd3: host_dout = {reg_read_data[15:8], 8'h00};      // high byte in upper position
-            default: host_dout = 16'd0;
+            2'd1: host_dout = reg_select;                    // reg_select echo
+            2'd2: host_dout = reg_read_data[7:0];            // low byte
+            2'd3: host_dout = reg_read_data[15:8];           // high byte
+            default: host_dout = 8'd0;
         endcase
     end
 

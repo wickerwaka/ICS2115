@@ -1,4 +1,5 @@
 #include "Vics2115.h"
+#include "Vics2115___024root.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
@@ -41,6 +42,7 @@ struct SimState {
     Vics2115*       top;
     VerilatedVcdC*  tfp;        // nullptr when VCD disabled
     uint64_t        sim_time = 0;
+    uint64_t        tick_count = 0;  // total tick() calls
 
     // Clock enable phase accumulator
     uint32_t        ce_accum = 0;
@@ -54,6 +56,10 @@ struct SimState {
 
     // Audio capture (interleaved L/R)
     std::vector<int16_t> audio_samples;
+
+    // Shadow state for PWRITE keyon detection
+    uint8_t shadow_reg_select = 0;
+    uint8_t shadow_osc_select = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -74,6 +80,7 @@ static bool generate_ce(SimState& s) {
 static void tick(SimState& s) {
     auto* top = s.top;
     auto* tfp = s.tfp;
+    s.tick_count++;
 
     // Provide ROM data from previous cycle's request (1-cycle latency)
     if (s.rom_rd_prev) {
@@ -110,7 +117,7 @@ static void tick(SimState& s) {
 // ---------------------------------------------------------------------------
 // Host bus: write to a port
 // ---------------------------------------------------------------------------
-static void host_write_port(SimState& s, uint8_t port, uint16_t data) {
+static void host_write_port(SimState& s, uint8_t port, uint8_t data) {
     auto* top = s.top;
 
     // Assert CS + WR with address and data
@@ -129,7 +136,7 @@ static void host_write_port(SimState& s, uint8_t port, uint16_t data) {
 // ---------------------------------------------------------------------------
 // Host bus: read from a port
 // ---------------------------------------------------------------------------
-static uint16_t host_read_port(SimState& s, uint8_t port) {
+static uint8_t host_read_port(SimState& s, uint8_t port) {
     auto* top = s.top;
 
     // Assert CS + RD with address
@@ -139,7 +146,7 @@ static uint16_t host_read_port(SimState& s, uint8_t port) {
     tick(s);
 
     // Capture output while still asserted
-    uint16_t val = top->host_dout;
+    uint8_t val = top->host_dout;
 
     // Deassert
     top->host_cs_n = 1;
@@ -155,11 +162,11 @@ static uint16_t host_read_port(SimState& s, uint8_t port) {
 static uint16_t host_reg_read(SimState& s, uint8_t reg) {
     // Port 1: set register address
     host_write_port(s, 1, reg);
-    // Port 3: read high byte (returns value in high byte position)
-    uint16_t hi = host_read_port(s, 3);
-    // Port 2: read low byte (returns value in low byte position)
-    uint16_t lo = host_read_port(s, 2);
-    return (hi & 0xFF00) | (lo & 0x00FF);
+    // Port 3: read high byte
+    uint8_t hi = host_read_port(s, 3);
+    // Port 2: read low byte
+    uint8_t lo = host_read_port(s, 2);
+    return ((uint16_t)hi << 8) | lo;
 }
 
 // ---------------------------------------------------------------------------
@@ -380,6 +387,81 @@ static void write_wav(const char* filename,
 }
 
 // ---------------------------------------------------------------------------
+// Extract bits [hi:lo] from VlWide<8> (8×32-bit words, LSB-first)
+// ---------------------------------------------------------------------------
+static uint32_t extract_bits(const VlWide<8>& w, int hi, int lo) {
+    uint32_t result = 0;
+    for (int bit = lo; bit <= hi; bit++) {
+        int word = bit / 32;
+        int pos  = bit % 32;
+        if (w[word] & (1u << pos))
+            result |= 1u << (bit - lo);
+    }
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Dump voice state on keyon — extracts from Verilator's packed struct
+// ---------------------------------------------------------------------------
+static void dump_voice_state(SimState& s, int voice) {
+    const auto& vr = s.top->rootp->ics2115__DOT__voice_regs[voice];
+
+    // Extract all fields per bit layout (voice_state_t, 245 bits, LSB-first)
+    uint32_t state_ramp = extract_bits(vr, 6, 0);
+    uint32_t state_on   = extract_bits(vr, 7, 7);
+    uint32_t vol_mode   = extract_bits(vr, 15, 8);
+    uint32_t vol_ctrl   = extract_bits(vr, 23, 16);
+    uint32_t vol_pan    = extract_bits(vr, 31, 24);
+    uint32_t vol_incr   = extract_bits(vr, 39, 32);
+    uint32_t vol_end    = extract_bits(vr, 65, 40);
+    uint32_t vol_start  = extract_bits(vr, 91, 66);
+    uint32_t vol_acc    = extract_bits(vr, 117, 92);
+    uint32_t osc_ctl    = extract_bits(vr, 125, 118);
+    uint32_t osc_conf   = extract_bits(vr, 133, 126);
+    uint32_t osc_saddr  = extract_bits(vr, 141, 134);
+    uint32_t osc_end    = extract_bits(vr, 170, 142);
+    uint32_t osc_start  = extract_bits(vr, 199, 171);
+    uint32_t osc_fc     = extract_bits(vr, 215, 200);
+    uint32_t osc_acc    = extract_bits(vr, 244, 216);
+
+    // Derive ROM address range: osc_saddr provides bits [27:20], osc_start/end
+    // are 20.9 fixed point — integer part is bits [28:9]
+    uint32_t rom_base   = (uint32_t)osc_saddr << 20;
+    uint32_t addr_start = rom_base | (osc_start >> 9);
+    uint32_t addr_end   = rom_base | (osc_end >> 9);
+
+    // Sample format from osc_conf
+    bool is_ulaw   = (osc_conf >> 2) & 1;   // bit 2: µ-law
+    bool is_16bit  = (osc_conf >> 0) & 1;    // bit 0: 16-bit (when not µ-law)
+
+    // Loop mode from osc_ctl
+    bool loop_en   = !((osc_ctl >> 6) & 1);  // bit 6: M2 (0=loop, 1=one-shot)
+    bool bidir     = (osc_ctl >> 5) & 1;      // bit 5: M1 (bidirectional)
+    bool irq_en    = (osc_ctl >> 7) & 1;      // bit 7: R (IRQ enable)
+
+    const char* fmt_str = is_ulaw ? "µ-law" : (is_16bit ? "16-bit PCM" : "8-bit PCM");
+    const char* loop_str = loop_en ? (bidir ? "bidir" : "forward") : "one-shot";
+
+    printf("┌─── KEYON Voice %d ────────────────────────────────────────┐\n", voice);
+    printf("│ ROM range    : 0x%06X – 0x%06X (%u samples)            \n",
+           addr_start, addr_end, addr_end > addr_start ? addr_end - addr_start : 0);
+    printf("│ Sample format: %s                                       \n", fmt_str);
+    printf("│ Loop mode    : %s (IRQ: %s)                             \n",
+           loop_str, irq_en ? "on" : "off");
+    printf("│ Frequency    : osc_fc=0x%04X                            \n", osc_fc);
+    printf("│ Volume       : acc=0x%04X start=0x%04X end=0x%04X       \n",
+           vol_acc, vol_start, vol_end);
+    printf("│ Vol ctrl     : ctrl=0x%02X incr=0x%02X mode=0x%02X ramp=%u\n",
+           vol_ctrl, vol_incr, vol_mode, state_ramp);
+    printf("│ Pan          : 0x%02X                                    \n", vol_pan);
+    printf("│ Osc state    : on=%u ctl=0x%02X conf=0x%02X saddr=0x%02X\n",
+           state_on, osc_ctl, osc_conf, osc_saddr);
+    printf("│ Osc acc      : 0x%08X (addr=%u.%03u)                    \n",
+           osc_acc, osc_acc >> 9, osc_acc & 0x1FF);
+    printf("└──────────────────────────────────────────────────────────┘\n");
+}
+
+// ---------------------------------------------------------------------------
 // Script executor
 // ---------------------------------------------------------------------------
 static int execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
@@ -392,6 +474,11 @@ static int execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
         case CmdType::WRITE:
             printf("[%zu] write reg 0x%02X = 0x%04X\n", i, cmd.reg, cmd.value);
             host_reg_write(s, cmd.reg, cmd.value);
+            // Keyon detection: writing 0x0000 to reg 0x10 (OscCtl) triggers keyon
+            if (cmd.reg == 0x10 && cmd.value == 0x0000) {
+                int voice = s.top->rootp->ics2115__DOT__osc_select;
+                dump_voice_state(s, voice);
+            }
             break;
 
         case CmdType::READ: {
@@ -464,29 +551,35 @@ static int execute_script(SimState& s, const std::vector<ScriptCmd>& cmds) {
 
         case CmdType::PWRITE:
             printf("[%zu] pwrite port 0x%02X = 0x%02X\n", i, cmd.reg, cmd.value);
+            // Update shadow state before the write (track what the host thinks
+            // reg_select and osc_select are)
+            if (cmd.reg == 0x01) {
+                s.shadow_reg_select = cmd.value & 0xFF;
+            } else if (cmd.reg == 0x02 && s.shadow_reg_select == 0x4F) {
+                s.shadow_osc_select = cmd.value & 0x1F;
+            }
             host_write_port(s, cmd.reg, cmd.value);
+            // Keyon detection: port 3 write of 0x00 when reg_select is 0x10
+            if (cmd.reg == 0x03 && s.shadow_reg_select == 0x10 && (cmd.value & 0xFF) == 0x00) {
+                dump_voice_state(s, s.shadow_osc_select);
+            }
             break;
 
         case CmdType::PREAD: {
-            uint16_t val = host_read_port(s, cmd.reg);
-            printf("[%zu] pread port 0x%02X = 0x%04X\n", i, cmd.reg, val);
+            uint8_t val = host_read_port(s, cmd.reg);
+            printf("[%zu] pread port 0x%02X = 0x%02X\n", i, cmd.reg, val);
             break;
         }
 
         case CmdType::PEXPECT: {
-            uint16_t raw = host_read_port(s, cmd.reg);
-            uint8_t actual;
-            if (cmd.reg == 3)
-                actual = (raw >> 8) & 0xFF;
-            else
-                actual = raw & 0xFF;
+            uint8_t actual = host_read_port(s, cmd.reg);
             uint8_t expected = cmd.value & 0xFF;
             if (actual == expected) {
-                printf("[%zu] PEXPECT port 0x%02X: expected 0x%02X got 0x%02X (raw 0x%04X) — PASS\n",
-                       i, cmd.reg, expected, actual, raw);
+                printf("[%zu] PEXPECT port 0x%02X: expected 0x%02X got 0x%02X — PASS\n",
+                       i, cmd.reg, expected, actual);
             } else {
-                printf("[%zu] PEXPECT port 0x%02X: expected 0x%02X got 0x%02X (raw 0x%04X) — FAIL\n",
-                       i, cmd.reg, expected, actual, raw);
+                printf("[%zu] PEXPECT port 0x%02X: expected 0x%02X got 0x%02X — FAIL\n",
+                       i, cmd.reg, expected, actual);
                 error_count++;
             }
             break;
@@ -609,8 +702,8 @@ int main(int argc, char** argv) {
     }
     top->final();
 
-    printf("Simulation complete. %zu audio frames captured.\n",
-           s.audio_samples.size() / 2);
+    printf("Simulation complete. %zu audio frames captured. %llu ticks total.\n",
+           s.audio_samples.size() / 2, (unsigned long long)s.tick_count);
     if (enable_vcd)
         printf("VCD: %s\n", vcd_file);
 

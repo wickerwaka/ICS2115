@@ -19,7 +19,6 @@ from collections import Counter
 PEXPECT_RE = re.compile(
     r'\[(\d+)\] PEXPECT port (0x[0-9A-Fa-f]+): '
     r'expected (0x[0-9A-Fa-f]+) got (0x[0-9A-Fa-f]+) '
-    r'\(raw (0x[0-9A-Fa-f]+)\) '
     r'[—\-]+\s*(PASS|FAIL)'
 )
 
@@ -42,7 +41,7 @@ KNOWN_TIMING_DIVERGENCES = {
 
 
 def parse_line(line):
-    """Parse a PEXPECT output line. Returns (line_num, port, expected, got, raw, verdict) or None."""
+    """Parse a PEXPECT output line. Returns (line_num, port, expected, got, verdict) or None."""
     m = PEXPECT_RE.search(line)
     if not m:
         return None
@@ -51,8 +50,7 @@ def parse_line(line):
         int(m.group(2), 16),   # port
         int(m.group(3), 16),   # expected
         int(m.group(4), 16),   # got
-        int(m.group(5), 16),   # raw
-        m.group(6),            # verdict: PASS or FAIL
+        m.group(5),            # verdict: PASS or FAIL
     )
 
 
@@ -76,7 +74,7 @@ def analyze(input_stream):
         parsed = parse_line(line)
         if parsed is None:
             continue
-        line_num, port, expected, got, raw, verdict = parsed
+        line_num, port, expected, got, verdict = parsed
         if verdict == "PASS":
             passes += 1
         else:
