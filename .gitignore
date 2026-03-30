@@ -29,4 +29,16 @@ tmp/
 
 # Verilog dump files
 *.vcd
+*.fst
+
+# Verilator build artifacts
+**/obj_dir/
+
+# Simulation output
+*.wav
+
+# Precompiled headers
+*.gch
+
+# ROM images
 roms/
